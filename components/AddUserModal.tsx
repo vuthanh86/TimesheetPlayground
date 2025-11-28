@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
-import { X, UserPlus, User, Shield, Type } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, UserPlus, User, Shield, Type, Edit2 } from 'lucide-react';
 import { User as UserType, UserRole } from '../types';
 
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (user: Omit<UserType, 'id'>) => void;
+  userToEdit?: UserType | null;
 }
 
-const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) => {
+const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, userToEdit }) => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<UserRole>('Employee');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (userToEdit) {
+        setName(userToEdit.name);
+        setUsername(userToEdit.username);
+        setRole(userToEdit.role);
+      } else {
+        setName('');
+        setUsername('');
+        setRole('Employee');
+      }
+    }
+  }, [isOpen, userToEdit]);
 
   if (!isOpen) return null;
 
@@ -22,9 +37,6 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) 
       username,
       role
     });
-    setName('');
-    setUsername('');
-    setRole('Employee');
     onClose();
   };
 
@@ -36,9 +48,13 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) 
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <div className="p-1.5 bg-indigo-100 rounded-lg">
-              <UserPlus className="w-5 h-5 text-indigo-600" />
+              {userToEdit ? (
+                <Edit2 className="w-5 h-5 text-indigo-600" />
+              ) : (
+                <UserPlus className="w-5 h-5 text-indigo-600" />
+              )}
             </div>
-            Add New User
+            {userToEdit ? 'Edit User' : 'Add New User'}
           </h2>
           <button 
             onClick={onClose} 
@@ -99,8 +115,8 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) 
               type="submit"
               className="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
             >
-              <UserPlus className="w-4 h-4" />
-              Create User
+              {userToEdit ? <Edit2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+              {userToEdit ? 'Update User' : 'Create User'}
             </button>
           </div>
         </form>

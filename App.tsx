@@ -39,19 +39,40 @@ const MOCK_USERS_INIT: User[] = [
   { id: 'u2', username: 'jane', name: 'Jane Designer', role: 'Employee' },
 ];
 
-const INITIAL_DATA: TimesheetEntry[] = [
-  // Alex's Entries
-  { id: '1', userId: 'u1', userName: 'Alex Dev', date: '2023-10-23', startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Approved' },
-  { id: '2', userId: 'u1', userName: 'Alex Dev', date: '2023-10-23', startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Approved', dependencies: ['1'] },
-  { id: '3', userId: 'u1', userName: 'Alex Dev', date: '2023-10-24', startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Approved' },
-  { id: '4', userId: 'u1', userName: 'Alex Dev', date: '2023-10-24', startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'Pending' },
-  { id: '5', userId: 'u1', userName: 'Alex Dev', date: '2023-10-25', startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'Approved', dependencies: ['2'] },
-  { id: '6', userId: 'u1', userName: 'Alex Dev', date: '2023-10-25', startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'Pending', dependencies: ['5'] },
-  
-  // Jane's Entries (for multi-user testing)
-  { id: '7', userId: 'u2', userName: 'Jane Designer', date: '2023-10-23', startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Approved' },
-  { id: '8', userId: 'u2', userName: 'Jane Designer', date: '2023-10-24', startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Approved' },
-];
+// Helper for local date string YYYY-MM-DD
+const getLocalDateStr = (d: Date) => {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+
+// Generate dynamic initial data based on current week
+const getInitialData = (): TimesheetEntry[] => {
+  const today = new Date();
+  const day = today.getDay(); 
+  // Calculate Monday of current week
+  const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(today);
+  monday.setDate(diffToMon);
+
+  const getDateStr = (offset: number) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    return getLocalDateStr(d);
+  };
+
+  return [
+    // Alex's Entries
+    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Approved' },
+    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Approved', dependencies: ['1'] },
+    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Approved' },
+    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'Pending' },
+    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'Approved', dependencies: ['2'] },
+    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'Pending', dependencies: ['5'] },
+    
+    // Jane's Entries
+    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Approved' },
+    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Approved' },
+  ];
+};
 
 const INITIAL_TASKS: TaskDefinition[] = [
   { id: 'PROJ-101', name: 'PROJ-101: Authentication System' },
@@ -74,15 +95,16 @@ function App() {
 
   // App State
   const [view, setView] = useState<ViewType>('DASHBOARD');
-  const [entries, setEntries] = useState<TimesheetEntry[]>(INITIAL_DATA);
+  // Initialize with dynamic data so "This Week" is populated
+  const [entries, setEntries] = useState<TimesheetEntry[]>(getInitialData);
   const [tasks, setTasks] = useState<TaskDefinition[]>(INITIAL_TASKS);
   
   // Filter States
-  const [currentDate, setCurrentDate] = useState<Date>(new Date('2023-10-23'));
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('WEEK');
   const [customRange, setCustomRange] = useState<{start: string, end: string}>({
-     start: new Date('2023-10-23').toISOString().split('T')[0],
-     end: new Date('2023-10-29').toISOString().split('T')[0]
+     start: getLocalDateStr(new Date()),
+     end: getLocalDateStr(new Date())
   });
   const [activeFilter, setActiveFilter] = useState<{ type: 'CATEGORY' | 'TASK_NAME', value: string } | null>(null);
 
@@ -135,9 +157,10 @@ function App() {
     const { start, end } = getViewDateRange();
     
     let result = accessibleEntries.filter(e => {
-        const d = new Date(e.date);
-        d.setHours(12,0,0,0); 
-        return d >= start && d <= end;
+        // Parse date string carefully to avoid timezone shift
+        const [y, m, d] = e.date.split('-').map(Number);
+        const entryDate = new Date(y, m - 1, d, 12, 0, 0); // Noon to avoid boundary issues
+        return entryDate >= start && entryDate <= end;
     });
 
     // 2. Apply Drill Down Filter
@@ -172,7 +195,7 @@ function App() {
   // Dashboard KPI Stats (Daily/Weekly/Monthly relative to current cursor)
   // Kept separate to provide context regardless of view mode
   const kpiStats = useMemo(() => {
-    const dateStr = currentDate.toISOString().split('T')[0];
+    const dateStr = getLocalDateStr(currentDate);
     const { start: weekStart, end: weekEnd } = { 
         start: new Date(currentDate), 
         end: new Date(currentDate) 
@@ -188,8 +211,9 @@ function App() {
 
     const daily = accessibleEntries.filter(e => e.date === dateStr).reduce((acc, c) => acc + c.durationHours, 0);
     const weekly = accessibleEntries.filter(e => {
-        const d = new Date(e.date); d.setHours(12,0,0,0);
-        return d >= weekStart && d <= weekEnd;
+        const [y, m, d] = e.date.split('-').map(Number);
+        const entryDate = new Date(y, m - 1, d, 12, 0, 0);
+        return entryDate >= weekStart && entryDate <= weekEnd;
     }).reduce((acc, c) => acc + c.durationHours, 0);
     const monthly = accessibleEntries.filter(e => e.date.startsWith(monthStr)).reduce((acc, c) => acc + c.durationHours, 0);
 
@@ -232,7 +256,7 @@ function App() {
   const handleGenerateData = async () => {
     if (currentUser?.role !== 'Manager') return;
     setIsAnalyzing(true); 
-    const newEntries = await generateMockTimesheets(currentDate.toISOString().split('T')[0], 5);
+    const newEntries = await generateMockTimesheets(getLocalDateStr(currentDate), 5);
     if (newEntries.length > 0) {
       setEntries(prev => [...prev, ...newEntries]);
     }
@@ -280,6 +304,11 @@ function App() {
       ...userData
     };
     setUsers(prev => [...prev, newUser]);
+  };
+
+  const handleEditUser = (updatedUser: User) => {
+    if (currentUser?.role !== 'Manager') return;
+    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -487,6 +516,7 @@ function App() {
               users={users} 
               currentUser={currentUser}
               onAddUser={handleAddUser}
+              onEditUser={handleEditUser}
               onDeleteUser={handleDeleteUser}
             />
           ) : (
@@ -556,6 +586,7 @@ function App() {
                   <div className="lg:col-span-2">
                     <GanttChart 
                       entries={filteredEntries} 
+                      allEntries={entries}
                       startDate={ganttProps.startDate}
                       daysToShow={ganttProps.daysToShow}
                       onTaskClick={(name) => setActiveFilter({ type: 'TASK_NAME', value: name })} 
@@ -633,7 +664,7 @@ function App() {
         isOpen={isLogModalOpen}
         onClose={handleModalClose}
         onSave={handleSaveEntry}
-        initialDate={currentDate.toISOString().split('T')[0]}
+        initialDate={getLocalDateStr(currentDate)}
         availableTasks={entries}
         taskOptions={tasks}
         entryToEdit={editingEntry}

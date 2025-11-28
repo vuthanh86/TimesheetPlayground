@@ -1,23 +1,44 @@
 import React, { useState } from 'react';
-import { User, Trash2, Shield, UserPlus, Search } from 'lucide-react';
+import { User, Trash2, Shield, UserPlus, Search, Edit2 } from 'lucide-react';
 import { User as UserType } from '../types';
 import AddUserModal from './AddUserModal';
 
 interface UserManagementProps {
   users: UserType[];
   onAddUser: (user: Omit<UserType, 'id'>) => void;
+  onEditUser: (user: UserType) => void;
   onDeleteUser: (userId: string) => void;
   currentUser: UserType;
 }
 
-const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onDeleteUser, currentUser }) => {
-  const [isAddModalOpen, setAddModalOpen] = useState(false);
+const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onEditUser, onDeleteUser, currentUser }) => {
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleAddClick = () => {
+    setEditingUser(null);
+    setModalOpen(true);
+  };
+
+  const handleEditClick = (user: UserType) => {
+    setEditingUser(user);
+    setModalOpen(true);
+  };
+
+  const handleSaveUser = (userData: Omit<UserType, 'id'>) => {
+    if (editingUser) {
+      onEditUser({ ...editingUser, ...userData });
+    } else {
+      onAddUser(userData);
+    }
+    setModalOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -33,7 +54,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onDel
            />
         </div>
         <button 
-          onClick={() => setAddModalOpen(true)}
+          onClick={handleAddClick}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
         >
           <UserPlus className="w-4 h-4" />
@@ -81,13 +102,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onDel
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     {user.id !== currentUser.id && (
-                      <button 
-                        onClick={() => onDeleteUser(user.id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
-                        title="Delete User"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => handleEditClick(user)}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors group"
+                          title="Edit User"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => onDeleteUser(user.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
+                          title="Delete User"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -98,9 +128,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onDel
       </div>
 
       <AddUserModal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setAddModalOpen(false)} 
-        onSave={onAddUser} 
+        isOpen={isModalOpen} 
+        onClose={() => setModalOpen(false)} 
+        onSave={handleSaveUser}
+        userToEdit={editingUser}
       />
     </div>
   );
