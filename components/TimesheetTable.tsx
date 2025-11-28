@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { TimesheetEntry } from '../types';
-import { Clock, CheckCircle2, Circle, AlertTriangle, HelpCircle, Pencil, User } from 'lucide-react';
+import { Clock, CheckCircle2, Circle, AlertTriangle, HelpCircle, Pencil, User as UserIcon } from 'lucide-react';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
@@ -19,6 +19,14 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
     return { status: parent.status, name: parent.taskName, id: parent.id };
   };
 
+  // Calculate colSpan dynamically based on visible columns
+  const getColSpan = () => {
+    let cols = 6; // Date, Project, Desc, Dep, Hours, Status
+    if (showUserColumn) cols += 1;
+    if (onEdit) cols += 1;
+    return cols;
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -26,7 +34,14 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-              {showUserColumn && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>}
+              {showUserColumn && (
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <div className="flex items-center gap-1">
+                    <UserIcon className="w-3 h-3" />
+                    <span>Employee</span>
+                  </div>
+                </th>
+              )}
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Project / Task</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Dependencies</th>
@@ -38,7 +53,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
           <tbody className="divide-y divide-slate-100">
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={onEdit ? (showUserColumn ? 8 : 7) : (showUserColumn ? 7 : 6)} className="px-6 py-8 text-center text-slate-400 italic">
+                <td colSpan={getColSpan()} className="px-6 py-8 text-center text-slate-400 italic">
                   No entries found for this period.
                 </td>
               </tr>
@@ -46,8 +61,17 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
               entries.map((entry) => {
                 const dependencies = entry.dependencies || [];
                 
+                // Check for unmet dependencies (Rejected or Missing) to highlight the row
+                const hasUnmetDependencies = dependencies.some(depId => {
+                  const details = getDependencyDetails(depId);
+                  return details.status === 'Rejected' || details.status === 'missing';
+                });
+                
                 return (
-                  <tr key={entry.id} className="hover:bg-slate-50 transition-colors group">
+                  <tr 
+                    key={entry.id} 
+                    className={`transition-colors group ${hasUnmetDependencies ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-3">
                         <div className="p-2 bg-slate-100 rounded-md">
@@ -61,11 +85,14 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
                     </td>
                     {showUserColumn && (
                        <td className="px-6 py-4 whitespace-nowrap">
-                         <div className="flex items-center space-x-2">
-                           <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                         <div className="flex items-center space-x-3">
+                           <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-sm">
                              {entry.userName.charAt(0)}
                            </div>
-                           <span className="text-sm text-slate-700">{entry.userName}</span>
+                           <div className="flex flex-col">
+                             <span className="text-sm font-medium text-slate-700">{entry.userName}</span>
+                             <span className="text-[10px] text-slate-400">ID: {entry.userId}</span>
+                           </div>
                          </div>
                        </td>
                     )}

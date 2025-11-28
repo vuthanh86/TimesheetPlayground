@@ -19,14 +19,6 @@ export interface TaskDefinition {
   name: string; // e.g. "PROJ-101: Authentication System"
 }
 
-export enum ViewMode {
-  DASHBOARD = 'DASHBOARD',
-  DAILY = 'DAILY',
-  WEEK = 'WEEK',
-  MONTH = 'MONTH',
-  TASK = 'TASK'
-}
-
 export interface AIAnalysisResult {
   summary: string;
   efficiencyScore: number;

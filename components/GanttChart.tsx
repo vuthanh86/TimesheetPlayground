@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TimesheetEntry } from '../types';
 
@@ -55,11 +56,18 @@ const GanttChart: React.FC<GanttChartProps> = ({ entries, startDate, daysToShow 
     }
   };
 
+  // Dynamic Grid Style for variable columns
+  // First column 250px, then N columns of min 40px
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: `250px repeat(${daysToShow}, minmax(40px, 1fr))`
+  };
+
   return (
     <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
       <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white relative z-20">
-        <h3 className="font-bold text-slate-800">Task Timeline (This Week)</h3>
-        <div className="flex gap-2 text-xs">
+        <h3 className="font-bold text-slate-800">Task Timeline</h3>
+        <div className="flex gap-2 text-xs flex-wrap justify-end">
           {['Development', 'Design', 'Meeting'].map(cat => (
              <div key={cat} className="flex items-center gap-1">
                 <div className={`w-2 h-2 rounded-full ${getCategoryColor(cat).split(' ')[0]}`}></div>
@@ -75,8 +83,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ entries, startDate, daysToShow 
           <div className="max-h-[500px] overflow-y-auto">
             
             {/* Header Row - Sticky Top */}
-            <div className="grid grid-cols-[250px_repeat(7,1fr)] bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-              <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50">Task</div>
+            <div className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm" style={gridStyle}>
+              <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky left-0 z-20">Task</div>
               {days.map((day, i) => (
                 <div key={i} className="p-3 text-center border-l border-slate-100 bg-slate-50">
                   <div className="text-xs font-bold text-slate-700">{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
@@ -88,12 +96,12 @@ const GanttChart: React.FC<GanttChartProps> = ({ entries, startDate, daysToShow 
             {/* Task Rows */}
             <div className="divide-y divide-slate-100">
               {tasks.length === 0 ? (
-                 <div className="p-8 text-center text-slate-400 text-sm italic">No activity recorded for this week.</div>
+                 <div className="p-8 text-center text-slate-400 text-sm italic">No activity recorded for this period.</div>
               ) : (
                 tasks.map((task) => (
-                  <div key={task.name} className="grid grid-cols-[250px_repeat(7,1fr)] hover:bg-slate-50/50 transition-colors">
+                  <div key={task.name} className="hover:bg-slate-50/50 transition-colors" style={gridStyle}>
                     {/* Task Name Column */}
-                    <div className="p-3 flex flex-col justify-center">
+                    <div className="p-3 flex flex-col justify-center sticky left-0 bg-white hover:bg-slate-50 transition-colors z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                       <span 
                         onClick={() => onTaskClick?.(task.name)}
                         className={`text-sm font-medium text-slate-700 truncate ${onTaskClick ? 'cursor-pointer hover:text-indigo-600 hover:underline' : ''}`} 
@@ -130,8 +138,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ entries, startDate, daysToShow 
             </div>
 
             {/* Totals Row - Sticky Bottom */}
-            <div className="grid grid-cols-[250px_repeat(7,1fr)] bg-slate-50 border-t border-slate-200 sticky bottom-0 z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]">
-               <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50">
+            <div className="bg-slate-50 border-t border-slate-200 sticky bottom-0 z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]" style={gridStyle}>
+               <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50 sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                  Total Hours
                </div>
                {dailyTotals.map((total, i) => (
