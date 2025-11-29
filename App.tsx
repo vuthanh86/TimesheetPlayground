@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
-  PieChart, 
   Users, 
   ChevronLeft, 
   ChevronRight,
@@ -16,104 +16,87 @@ import {
   X,
   FilePlus2,
   LogOut,
-  ListFilter
+  ListFilter,
+  Search,
+  User as UserIcon,
+  Tag,
+  Layers,
+  Database
 } from 'lucide-react';
-import { ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
-import { TimesheetEntry, AIAnalysisResult, TaskDefinition, User } from './types';
+import { TimesheetEntry, TaskDefinition, User } from './types';
 import StatsCard from './components/StatsCard';
 import TimesheetTable from './components/TimesheetTable';
-import AIAnalysisPanel from './components/AIAnalysisPanel';
 import LogTimeModal from './components/LogTimeModal';
 import AddProjectModal from './components/AddProjectModal';
 import LoginScreen from './components/LoginScreen';
 import GanttChart from './components/GanttChart';
 import UserManagement from './components/UserManagement';
-import { analyzeTimesheetData, generateMockTimesheets } from './services/geminiService';
-
-// Constants
-const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#10b981', '#f59e0b'];
-
-const MOCK_USERS_INIT: User[] = [
-  { id: 'm1', username: 'admin', name: 'Sarah Manager', role: 'Manager' },
-  { id: 'u1', username: 'alex', name: 'Alex Dev', role: 'Employee' },
-  { id: 'u2', username: 'jane', name: 'Jane Designer', role: 'Employee' },
-];
+import { generateMockTimesheets } from './services/geminiService';
+import * as DB from './services/db';
 
 // Helper for local date string YYYY-MM-DD
 const getLocalDateStr = (d: Date) => {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 };
 
-// Generate dynamic initial data based on current week
-const getInitialData = (): TimesheetEntry[] => {
-  const today = new Date();
-  const day = today.getDay(); 
-  // Calculate Monday of current week
-  const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(today);
-  monday.setDate(diffToMon);
-
-  const getDateStr = (offset: number) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + offset);
-    return getLocalDateStr(d);
-  };
-
-  return [
-    // Alex's Entries
-    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Approved' },
-    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Approved', dependencies: ['1'] },
-    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Approved' },
-    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'Pending' },
-    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'Approved', dependencies: ['2'] },
-    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'Pending', dependencies: ['5'] },
-    
-    // Jane's Entries
-    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Approved' },
-    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Approved' },
-  ];
-};
-
-const INITIAL_TASKS: TaskDefinition[] = [
-  { id: 'PROJ-101', name: 'PROJ-101: Authentication System' },
-  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics' },
-  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings' },
-  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting' },
-  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout' },
-  { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring' },
-  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout' },
-  { id: 'INT-001', name: 'INT-001: Weekly Team Sync' },
-];
-
 type DateFilterMode = 'WEEK' | 'MONTH' | 'RANGE';
 type ViewType = 'DASHBOARD' | 'USERS';
 
 function App() {
+  // DB Loading State
+  const [isDbReady, setIsDbReady] = useState(false);
+
   // Auth State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS_INIT);
+  const [users, setUsers] = useState<User[]>([]);
 
   // App State
   const [view, setView] = useState<ViewType>('DASHBOARD');
-  // Initialize with dynamic data so "This Week" is populated
-  const [entries, setEntries] = useState<TimesheetEntry[]>(getInitialData);
-  const [tasks, setTasks] = useState<TaskDefinition[]>(INITIAL_TASKS);
+  const [entries, setEntries] = useState<TimesheetEntry[]>([]);
+  const [tasks, setTasks] = useState<TaskDefinition[]>([]);
   
-  // Filter States
+  // Date Filter States
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('WEEK');
   const [customRange, setCustomRange] = useState<{start: string, end: string}>({
      start: getLocalDateStr(new Date()),
      end: getLocalDateStr(new Date())
   });
-  const [activeFilter, setActiveFilter] = useState<{ type: 'CATEGORY' | 'TASK_NAME', value: string } | null>(null);
 
-  const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // Advanced Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterUserId, setFilterUserId] = useState('ALL');
+  const [filterCategory, setFilterCategory] = useState('ALL');
+  const [filterTaskName, setFilterTaskName] = useState('ALL');
+
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isLogModalOpen, setLogModalOpen] = useState(false);
   const [isProjectModalOpen, setProjectModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimesheetEntry | null>(null);
+  
+  // State for pre-filling modal from Gantt click
+  const [logModalInitialDate, setLogModalInitialDate] = useState<string>(getLocalDateStr(new Date()));
+  const [logModalInitialTask, setLogModalInitialTask] = useState<string>('');
+
+  // Initialize DB
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await DB.initDB();
+        refreshData();
+        setIsDbReady(true);
+      } catch (err) {
+        console.error("Failed to init DB", err);
+      }
+    };
+    init();
+  }, []);
+
+  const refreshData = () => {
+    setUsers(DB.getUsers());
+    setTasks(DB.getTasks());
+    setEntries(DB.getTimesheets());
+  };
 
   // Filter entries available to the current view (Manager sees all, Employee sees own)
   const accessibleEntries = useMemo(() => {
@@ -121,6 +104,30 @@ function App() {
     if (currentUser.role === 'Manager') return entries;
     return entries.filter(e => e.userId === currentUser.id);
   }, [entries, currentUser]);
+
+  // Derived lists for dropdowns
+  const uniqueCategories = useMemo(() => Array.from(new Set(accessibleEntries.map(e => e.taskCategory))), [accessibleEntries]);
+  const uniqueTaskNames = useMemo(() => Array.from(new Set(accessibleEntries.map(e => e.taskName))), [accessibleEntries]);
+
+  // Helper to check if an entry matches the active attribute filters
+  const matchesFilters = useCallback((e: TimesheetEntry) => {
+    // 1. User Filter (Manager Only)
+    if (filterUserId !== 'ALL' && e.userId !== filterUserId) return false;
+    
+    // 2. Category Filter
+    if (filterCategory !== 'ALL' && e.taskCategory !== filterCategory) return false;
+    
+    // 3. Task/Project Filter
+    if (filterTaskName !== 'ALL' && e.taskName !== filterTaskName) return false;
+    
+    // 4. Search Query
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return e.taskName.toLowerCase().includes(q) || e.description.toLowerCase().includes(q) || e.userName.toLowerCase().includes(q);
+    }
+    
+    return true;
+  }, [filterUserId, filterCategory, filterTaskName, searchQuery]);
 
   // Helper to get ranges based on mode
   const getViewDateRange = useCallback(() => {
@@ -163,38 +170,18 @@ function App() {
         return entryDate >= start && entryDate <= end;
     });
 
-    // 2. Apply Drill Down Filter
-    if (activeFilter) {
-      result = result.filter(e => 
-          activeFilter.type === 'CATEGORY' 
-            ? e.taskCategory === activeFilter.value 
-            : e.taskName === activeFilter.value
-        );
-    }
+    // 2. Apply Attribute Filters (Search, User, Category, Task)
+    result = result.filter(matchesFilters);
 
     return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [accessibleEntries, getViewDateRange, activeFilter, currentUser]);
-
-  // View Stats (Derived from filteredEntries)
-  const viewStats = useMemo(() => {
-     const totalHours = filteredEntries.reduce((acc, curr) => acc + curr.durationHours, 0);
-     
-     // Task Distribution
-     const taskGroups: Record<string, number> = {};
-     filteredEntries.forEach(e => {
-       taskGroups[e.taskCategory] = (taskGroups[e.taskCategory] || 0) + e.durationHours;
-     });
-     const taskData = Object.keys(taskGroups).map(key => ({
-       name: key,
-       value: taskGroups[key]
-     }));
-
-     return { totalHours, taskData };
-  }, [filteredEntries]);
+  }, [accessibleEntries, getViewDateRange, matchesFilters, currentUser]);
 
   // Dashboard KPI Stats (Daily/Weekly/Monthly relative to current cursor)
-  // Kept separate to provide context regardless of view mode
+  // NOW RESPECTS ATTRIBUTE FILTERS (e.g. if User=Alex selected, stats show Alex's hours)
   const kpiStats = useMemo(() => {
+    // Base set of entries to calculate stats from (all time, but filtered by user/category/etc)
+    const attributeFiltered = accessibleEntries.filter(matchesFilters);
+
     const dateStr = getLocalDateStr(currentDate);
     const { start: weekStart, end: weekEnd } = { 
         start: new Date(currentDate), 
@@ -209,16 +196,16 @@ function App() {
 
     const monthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const daily = accessibleEntries.filter(e => e.date === dateStr).reduce((acc, c) => acc + c.durationHours, 0);
-    const weekly = accessibleEntries.filter(e => {
+    const daily = attributeFiltered.filter(e => e.date === dateStr).reduce((acc, c) => acc + c.durationHours, 0);
+    const weekly = attributeFiltered.filter(e => {
         const [y, m, d] = e.date.split('-').map(Number);
         const entryDate = new Date(y, m - 1, d, 12, 0, 0);
         return entryDate >= weekStart && entryDate <= weekEnd;
     }).reduce((acc, c) => acc + c.durationHours, 0);
-    const monthly = accessibleEntries.filter(e => e.date.startsWith(monthStr)).reduce((acc, c) => acc + c.durationHours, 0);
+    const monthly = attributeFiltered.filter(e => e.date.startsWith(monthStr)).reduce((acc, c) => acc + c.durationHours, 0);
 
     return { daily, weekly, monthly };
-  }, [accessibleEntries, currentDate]);
+  }, [accessibleEntries, currentDate, matchesFilters]);
 
   // Gantt Props
   const ganttProps = useMemo(() => {
@@ -232,8 +219,7 @@ function App() {
   // Handlers
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setActiveFilter(null);
-    setAnalysis(null);
+    clearFilters();
     setView('DASHBOARD');
   };
 
@@ -241,32 +227,82 @@ function App() {
     setCurrentUser(null);
   };
 
-  const handleAnalyze = useCallback(async () => {
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeTimesheetData(filteredEntries);
-      setAnalysis(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [filteredEntries]);
-
   const handleGenerateData = async () => {
     if (currentUser?.role !== 'Manager') return;
-    setIsAnalyzing(true); 
     const newEntries = await generateMockTimesheets(getLocalDateStr(currentDate), 5);
     if (newEntries.length > 0) {
-      setEntries(prev => [...prev, ...newEntries]);
+      // Add entries to DB
+      newEntries.forEach(entry => DB.addTimesheetEntry(entry));
+      refreshData();
     }
-    setIsAnalyzing(false);
+  };
+
+  // --- VALIDATION HELPERS ---
+  const checkOverlap = (userId: string, date: string, start: string, end: string, excludeId?: string) => {
+    // Convert HH:mm to minutes
+    const toMins = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const newStart = toMins(start);
+    const newEnd = toMins(end);
+
+    const userEntries = entries.filter(e => e.userId === userId && e.date === date && e.id !== excludeId);
+    
+    return userEntries.some(e => {
+      const eStart = toMins(e.startTime);
+      const eEnd = toMins(e.endTime);
+      // Overlap condition: (StartA < EndB) and (EndA > StartB)
+      return newStart < eEnd && newEnd > eStart;
+    });
+  };
+
+  const checkWeeklyLimit = (userId: string, dateStr: string, addDuration: number, excludeId?: string) => {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    const weekStart = new Date(d);
+    weekStart.setDate(diff);
+    weekStart.setHours(0,0,0,0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23,59,59,999);
+
+    const weekEntries = entries.filter(e => {
+       if (e.userId !== userId) return false;
+       if (e.id === excludeId) return false;
+       const [y, m, day] = e.date.split('-').map(Number);
+       const eDate = new Date(y, m-1, day, 12);
+       return eDate >= weekStart && eDate <= weekEnd;
+    });
+
+    const currentTotal = weekEntries.reduce((acc, e) => acc + e.durationHours, 0);
+    return (currentTotal + addDuration) > 40;
   };
 
   const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName' | 'status'>) => {
     if (!currentUser) return;
+    
+    // Determine User ID (Editing self or creating for self)
+    // Note: If managers could edit others' time, we'd need to pull userId from editingEntry
+    const targetUserId = editingEntry ? editingEntry.userId : currentUser.id;
+
+    // 1. Validation: Overlap
+    if (checkOverlap(targetUserId, entryData.date, entryData.startTime, entryData.endTime, editingEntry?.id)) {
+      alert("Error: Time entry overlaps with an existing entry.");
+      return;
+    }
+
+    // 2. Validation: 40 Hours Limit
+    if (checkWeeklyLimit(targetUserId, entryData.date, entryData.durationHours, editingEntry?.id)) {
+      alert("Error: This entry exceeds the 40-hour weekly limit.");
+      return;
+    }
+
     if (editingEntry) {
-      setEntries(prev => prev.map(e => e.id === editingEntry.id ? { ...e, ...entryData, status: 'Pending' } : e));
+      const updatedEntry: TimesheetEntry = { ...editingEntry, ...entryData, status: 'Pending' };
+      DB.updateTimesheetEntry(updatedEntry);
       setEditingEntry(null);
     } else {
       const newEntry: TimesheetEntry = {
@@ -276,15 +312,26 @@ function App() {
         status: 'Pending',
         ...entryData
       };
-      setEntries(prev => [newEntry, ...prev]);
+      DB.addTimesheetEntry(newEntry);
     }
+    refreshData();
     setLogModalOpen(false);
   };
 
   const handleEditEntry = (entry: TimesheetEntry) => {
     if (currentUser?.role !== 'Manager' && entry.userId !== currentUser?.id) return;
     setEditingEntry(entry);
+    setLogModalInitialDate(entry.date);
+    setLogModalInitialTask(entry.taskName);
     setLogModalOpen(true);
+  };
+
+  const handleGanttCellClick = (date: Date, taskName?: string) => {
+     // Pre-fill modal for new entry
+     setEditingEntry(null);
+     setLogModalInitialDate(getLocalDateStr(date));
+     setLogModalInitialTask(taskName || '');
+     setLogModalOpen(true);
   };
 
   const handleModalClose = () => {
@@ -294,7 +341,8 @@ function App() {
 
   const handleAddProject = (newTask: TaskDefinition) => {
     if (currentUser?.role !== 'Manager') return;
-    setTasks(prev => [...prev, newTask]);
+    DB.addTask(newTask);
+    refreshData();
   };
 
   const handleAddUser = (userData: Omit<User, 'id'>) => {
@@ -303,20 +351,28 @@ function App() {
       id: `u-${Date.now()}`,
       ...userData
     };
-    setUsers(prev => [...prev, newUser]);
+    DB.addUser(newUser);
+    refreshData();
   };
 
   const handleEditUser = (updatedUser: User) => {
     if (currentUser?.role !== 'Manager') return;
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    DB.updateUser(updatedUser);
+    refreshData();
   };
 
   const handleDeleteUser = (userId: string) => {
     if (currentUser?.role !== 'Manager') return;
-    setUsers(prev => prev.filter(u => u.id !== userId));
+    DB.deleteUser(userId);
+    refreshData();
   };
 
-  const clearFilter = () => setActiveFilter(null);
+  const clearFilters = () => {
+      setSearchQuery('');
+      setFilterUserId('ALL');
+      setFilterCategory('ALL');
+      setFilterTaskName('ALL');
+  };
 
   const formatDateRangeDisplay = () => {
     const { start, end } = getViewDateRange();
@@ -348,6 +404,19 @@ function App() {
     setCurrentDate(newDate);
   };
 
+  // Check if any filter is active for the "Clear" button state
+  const isFilterActive = searchQuery !== '' || filterUserId !== 'ALL' || filterCategory !== 'ALL' || filterTaskName !== 'ALL';
+
+  if (!isDbReady) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <Database className="w-12 h-12 text-indigo-600 animate-pulse mb-4" />
+        <h2 className="text-lg font-semibold text-slate-700">Initializing SQLite Database...</h2>
+        <p className="text-sm text-slate-500 mt-2">Setting up secure storage environment</p>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return <LoginScreen onLogin={handleLogin} users={users} />;
   }
@@ -367,7 +436,7 @@ function App() {
         <nav className="flex-1 px-4 space-y-2 mt-4">
           <button 
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${view === 'DASHBOARD' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`} 
-            onClick={() => { setView('DASHBOARD'); clearFilter(); }}
+            onClick={() => { setView('DASHBOARD'); clearFilters(); }}
           >
             <Home className="w-5 h-5" />
             {isSidebarOpen && <span>Dashboard</span>}
@@ -391,7 +460,6 @@ function App() {
             <p className="text-xs font-medium text-indigo-200 uppercase mb-2">Dev Tools</p>
             <button 
               onClick={handleGenerateData} 
-              disabled={isAnalyzing}
               className="w-full bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-colors"
             >
               Generate Mock Data
@@ -404,7 +472,7 @@ function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         
         {/* Header */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
           <div className="flex flex-col gap-1">
              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                {view === 'DASHBOARD' 
@@ -480,7 +548,12 @@ function App() {
                 </button>
              )}
              <button 
-                onClick={() => setLogModalOpen(true)}
+                onClick={() => {
+                   setEditingEntry(null);
+                   setLogModalInitialDate(getLocalDateStr(new Date()));
+                   setLogModalInitialTask('');
+                   setLogModalOpen(true);
+                }}
                 className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm active:scale-95"
               >
                 <Plus className="w-4 h-4" />
@@ -509,7 +582,7 @@ function App() {
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
           
           {view === 'USERS' ? (
             <UserManagement 
@@ -522,32 +595,92 @@ function App() {
           ) : (
             // DASHBOARD VIEW
             <div className="space-y-6">
-                {/* Active Filter Banner */}
-                {activeFilter && (
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
-                          <Filter className="w-4 h-4" />
-                      </div>
-                      <div>
-                          <p className="text-sm font-bold text-indigo-900">
-                            Filtered by {activeFilter.type === 'CATEGORY' ? 'Category' : 'Project'}: <span className="font-normal">{activeFilter.value}</span>
-                          </p>
-                          <p className="text-xs text-indigo-600">Showing entries within current date selection</p>
-                      </div>
-                    </div>
-                    <button 
-                        onClick={clearFilter}
-                        className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1.5 hover:bg-indigo-100 rounded-md transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                        <span>Clear Filter</span>
-                    </button>
+                
+                {/* Advanced Filter Bar */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap gap-4 items-center animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2 text-slate-500 font-medium text-sm border-r border-slate-200 pr-4 mr-2">
+                    <Filter className="w-4 h-4" />
+                    Filters
                   </div>
-                )}
+
+                  {/* Search */}
+                  <div className="relative group">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500" />
+                     <input 
+                       type="text" 
+                       placeholder="Search tasks..." 
+                       value={searchQuery}
+                       onChange={(e) => setSearchQuery(e.target.value)}
+                       className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-48 transition-all"
+                     />
+                  </div>
+
+                  {/* User Filter (Manager Only) */}
+                  {currentUser.role === 'Manager' && (
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                      <select 
+                        value={filterUserId}
+                        onChange={(e) => setFilterUserId(e.target.value)}
+                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px]"
+                      >
+                        <option value="ALL">All Employees</option>
+                        {users.filter(u => u.role === 'Employee').map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Category Filter */}
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Tag className="w-4 h-4" />
+                    </div>
+                    <select 
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px]"
+                    >
+                      <option value="ALL">All Categories</option>
+                      {uniqueCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                   {/* Project / Task Filter */}
+                   <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <select 
+                      value={filterTaskName}
+                      onChange={(e) => setFilterTaskName(e.target.value)}
+                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px] max-w-[200px]"
+                    >
+                      <option value="ALL">All Projects</option>
+                      {uniqueTaskNames.map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {isFilterActive && (
+                    <button 
+                      onClick={clearFilters}
+                      className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      Clear
+                    </button>
+                  )}
+                </div>
 
                 {/* Row 1: High Level Stats (KPIS) */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <StatsCard 
                     title="Daily Hours (Today)" 
                     value={`${kpiStats.daily.toFixed(1)}h`} 
@@ -570,90 +703,40 @@ function App() {
                     icon={Calendar} 
                     color="text-purple-600 bg-purple-100" 
                   />
-                  <StatsCard 
-                    title="View Efficiency" 
-                    value={analysis ? `${analysis.efficiencyScore}%` : "85%"} 
-                    trend="AI Estimate"
-                    trendUp={true}
-                    icon={PieChart} 
-                    color="text-emerald-600 bg-emerald-100" 
-                  />
                 </div>
 
                 {/* Row 2: Charts (Contextual to Filter) */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="w-full">
                   {/* Gantt Chart */}
-                  <div className="lg:col-span-2">
                     <GanttChart 
                       entries={filteredEntries} 
                       allEntries={entries}
                       startDate={ganttProps.startDate}
                       daysToShow={ganttProps.daysToShow}
-                      onTaskClick={(name) => setActiveFilter({ type: 'TASK_NAME', value: name })} 
+                      onTaskClick={(name) => setFilterTaskName(name)} 
+                      onEntryClick={handleEditEntry}
+                      onCellClick={handleGanttCellClick}
                     />
-                  </div>
-                  <div className="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-[500px] flex flex-col">
-                      <h3 className="font-bold text-slate-800 mb-1 flex-shrink-0">Distribution</h3>
-                      <p className="text-xs text-slate-400 mb-4">Based on current date selection</p>
-                      <div className="flex-1 min-h-0">
-                        {viewStats.taskData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RePieChart>
-                              <Pie
-                                data={viewStats.taskData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                                onClick={(data) => setActiveFilter({ type: 'CATEGORY', value: data.name })}
-                                className="cursor-pointer outline-none"
-                              >
-                                {viewStats.taskData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity" />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                              <Legend verticalAlign="bottom" height={36}/>
-                            </RePieChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-slate-300 italic text-sm">
-                            No data for distribution
-                          </div>
-                        )}
-                      </div>
-                  </div>
                 </div>
 
-                {/* Row 3: Recent Activity & AI */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-slate-800 text-lg">
-                          Activity Log
-                        </h3>
-                        <span className="text-xs text-slate-500 font-medium px-2 py-1 bg-slate-100 rounded">
-                          {filteredEntries.length} entries found
-                        </span>
-                      </div>
-                      {/* Pass all entries for dependency checking */}
-                      <TimesheetTable 
-                        entries={filteredEntries} 
-                        allEntries={entries} 
-                        onTaskClick={(name) => setActiveFilter({ type: 'TASK_NAME', value: name })} 
-                        onEdit={handleEditEntry}
-                        showUserColumn={currentUser.role === 'Manager'}
-                      />
+                {/* Row 3: Recent Activity */}
+                <div className="w-full">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-slate-800 text-lg">
+                        Activity Log
+                      </h3>
+                      <span className="text-xs text-slate-500 font-medium px-2 py-1 bg-slate-100 rounded">
+                        {filteredEntries.length} entries found
+                      </span>
                     </div>
-                    <div className="lg:col-span-1">
-                      <AIAnalysisPanel 
-                          analysis={analysis} 
-                          isLoading={isAnalyzing} 
-                          onAnalyze={handleAnalyze} 
-                        />
-                    </div>
+                    {/* Pass all entries for dependency checking */}
+                    <TimesheetTable 
+                      entries={filteredEntries} 
+                      allEntries={entries} 
+                      onTaskClick={(name) => setFilterTaskName(name)} 
+                      onEdit={handleEditEntry}
+                      showUserColumn={currentUser.role === 'Manager'}
+                    />
                 </div>
             </div>
           )}
@@ -664,10 +747,12 @@ function App() {
         isOpen={isLogModalOpen}
         onClose={handleModalClose}
         onSave={handleSaveEntry}
-        initialDate={getLocalDateStr(currentDate)}
+        initialDate={logModalInitialDate}
+        initialTaskName={logModalInitialTask}
         availableTasks={entries}
         taskOptions={tasks}
         entryToEdit={editingEntry}
+        currentUser={currentUser}
       />
 
       <AddProjectModal

@@ -11,7 +11,7 @@ export interface TimesheetEntry {
   taskCategory: string; // e.g., 'Development', 'Meeting', 'Design'
   description: string;
   status: 'Approved' | 'Pending' | 'Rejected';
-  dependencies?: string[]; // IDs of tasks this task depends on
+  managerComment?: string; // Feedback from manager
 }
 
 export interface TaskDefinition {

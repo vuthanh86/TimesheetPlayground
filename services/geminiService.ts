@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { TimesheetEntry, AIAnalysisResult } from "../types";
 
@@ -17,9 +18,7 @@ export const analyzeTimesheetData = async (entries: TimesheetEntry[]): Promise<A
       Analyze the following timesheet data for a team member. 
       Provide a management summary, an efficiency score (0-100), assess burnout risk based on hours and task variety, and list 3 key insights/bullet points.
       
-      CRITICAL: Pay attention to 'dependencies' and 'taskName'. 
-      - If a task depends on other tasks that are NOT approved or missing from this list (implied unmet), flag this as a potential blocker.
-      - Use the specific 'taskName' to identify context switching or intense focus on specific projects.
+      CRITICAL: Use the specific 'taskName' to identify context switching or intense focus on specific projects.
 
       Data:
       ${JSON.stringify(entries.map(e => ({ 
@@ -30,7 +29,7 @@ export const analyzeTimesheetData = async (entries: TimesheetEntry[]): Promise<A
         category: e.taskCategory, 
         desc: e.description,
         status: e.status,
-        dependencies: e.dependencies 
+        managerComment: e.managerComment
       })))}
     `;
 
@@ -117,7 +116,7 @@ export const generateMockTimesheets = async (startDate: string, days: number): P
         id: `gen-${Date.now()}-${index}`,
         userId: "u1",
         userName: "Alex Dev",
-        dependencies: [] 
+        managerComment: ''
       }));
     }
     return [];
