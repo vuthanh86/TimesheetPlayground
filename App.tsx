@@ -748,6 +748,7 @@ function App() {
                       onTaskClick={(name) => setFilterTaskName(name)} 
                       onEntryClick={handleEditEntry}
                       onCellClick={handleGanttCellClick}
+                      onUserClick={(userId) => setFilterUserId(userId)}
                     />
                 </div>
 

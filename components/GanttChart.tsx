@@ -11,6 +11,7 @@ interface GanttChartProps {
   onTaskClick?: (taskName: string) => void;
   onEntryClick?: (entry: TimesheetEntry) => void;
   onCellClick?: (date: Date, taskName?: string) => void;
+  onUserClick?: (userId: string) => void;
 }
 
 interface TaskGroup {
@@ -26,7 +27,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
   daysToShow = 7, 
   onTaskClick, 
   onEntryClick,
-  onCellClick
+  onCellClick,
+  onUserClick
 }) => {
   const [hoveredTooltip, setHoveredTooltip] = useState<{x: number, y: number, entry: TimesheetEntry} | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -121,7 +123,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
           <h3 className="font-bold text-slate-800">Task Timeline</h3>
           <div className="flex gap-3 text-xs flex-wrap justify-end items-center">
             {activeUsers.map(u => (
-               <div key={u.id} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+               <div 
+                 key={u.id} 
+                 onClick={() => onUserClick?.(u.id)}
+                 className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-all ${onUserClick ? 'cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-sm bg-white' : 'bg-slate-50 border-slate-100'}`}
+                 title={onUserClick ? `Filter by ${u.name}` : undefined}
+               >
                   <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[9px] font-bold">
                     {u.name.charAt(0)}
                   </div>
