@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TimesheetEntry } from '../types';
 import { AlertTriangle, Lock, Clock, FileText, User as UserIcon } from 'lucide-react';
 
@@ -29,6 +29,15 @@ const GanttChart: React.FC<GanttChartProps> = ({
   onCellClick
 }) => {
   const [hoveredTooltip, setHoveredTooltip] = useState<{x: number, y: number, entry: TimesheetEntry} | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Responsive check
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Helper to compare dates (ignore time)
   const isToday = (d: Date) => {
@@ -69,6 +78,17 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return daysEntries.reduce((acc, curr) => acc + curr.durationHours, 0);
   });
 
+  // Extract unique users involved in these entries
+  const activeUsers = useMemo(() => {
+    const userMap = new Map();
+    entries.forEach(e => {
+      if (!userMap.has(e.userId)) {
+        userMap.set(e.userId, { name: e.userName, id: e.userId });
+      }
+    });
+    return Array.from(userMap.values());
+  }, [entries]);
+
   // Helper to check if an entry belongs to a specific date
   const getEntriesForDay = (taskEntries: TimesheetEntry[], date: Date) => {
     const dStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -87,56 +107,66 @@ const GanttChart: React.FC<GanttChartProps> = ({
   };
 
   // Dynamic Grid Style for variable columns
+  const taskColWidth = isMobile ? '140px' : '250px';
   const gridStyle = {
     display: 'grid',
-    gridTemplateColumns: `250px repeat(${daysToShow}, minmax(40px, 1fr))`
+    gridTemplateColumns: `${taskColWidth} repeat(${daysToShow}, minmax(40px, 1fr))`
   };
 
   return (
     <>
       <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white relative z-20">
+        {/* Fixed Header: Title & User Summary */}
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-20 shrink-0">
           <h3 className="font-bold text-slate-800">Task Timeline</h3>
-          <div className="flex gap-2 text-xs flex-wrap justify-end">
-            {['Development', 'Design', 'Meeting'].map(cat => (
-               <div key={cat} className="flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${getCategoryColor(cat).split(' ')[0]}`}></div>
-                  <span className="text-slate-500">{cat}</span>
+          <div className="flex gap-3 text-xs flex-wrap justify-end items-center">
+            {activeUsers.map(u => (
+               <div key={u.id} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+                  <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[9px] font-bold">
+                    {u.name.charAt(0)}
+                  </div>
+                  <span className="text-slate-600 font-medium">{u.name}</span>
                </div>
             ))}
+            {activeUsers.length === 0 && (
+              <span className="text-slate-400 italic">No active users</span>
+            )}
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <div className="min-w-[800px]">
-            {/* Vertical Scroll Container with Max Height */}
-            <div className="max-h-[500px] overflow-y-auto">
+        {/* Single Scroll Container for 2D Scrolling */}
+        <div className="overflow-auto max-h-[500px] w-full bg-slate-50 scroll-smooth">
+          <div className="min-w-max relative">
               
               {/* Header Row - Sticky Top */}
-              <div className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm" style={gridStyle}>
-                <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky left-0 z-20">Task</div>
+              <div className="bg-slate-50 border-b border-slate-200 sticky top-0 z-30 shadow-sm" style={gridStyle}>
+                {/* Frozen Corner Cell */}
+                <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky left-0 z-40 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                  Task
+                </div>
+                {/* Date Columns */}
                 {days.map((day, i) => (
-                  <div key={i} className={`p-3 text-center border-l border-slate-100 ${isToday(day) ? 'bg-amber-50 border-amber-100' : 'bg-slate-50'}`}>
-                    <div className={`text-xs font-bold ${isToday(day) ? 'text-indigo-600' : 'text-slate-700'}`}>
+                  <div key={i} className={`p-2 text-center border-l border-slate-100 flex flex-col justify-center ${isToday(day) ? 'bg-amber-50 border-amber-100' : 'bg-slate-50'}`}>
+                    <div className="text-[10px] uppercase text-slate-400 font-bold mb-0.5">
                       {day.toLocaleDateString('en-US', { weekday: 'short' })}
                     </div>
-                    <div className={`text-[10px] ${isToday(day) ? 'text-indigo-500 font-bold' : 'text-slate-400'}`}>
-                      {day.getDate()}
+                    <div className={`text-xs font-bold ${isToday(day) ? 'text-indigo-600' : 'text-slate-700'}`}>
+                      {day.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Task Rows */}
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 bg-white">
                 {tasks.length === 0 ? (
-                   <div className="p-8 text-center text-slate-400 text-sm italic">No activity recorded for this period.</div>
+                   <div className="p-8 text-center text-slate-400 text-sm italic w-full">No activity recorded for this period.</div>
                 ) : (
                   tasks.map((task) => {
                     return (
                       <div key={task.name} className="hover:bg-slate-50/50 transition-colors group" style={gridStyle}>
-                        {/* Task Name Column */}
-                        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
+                        {/* Task Name Column - Sticky Left */}
+                        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
                           <div className="flex items-start justify-between gap-1">
                             <span 
                               onClick={() => onTaskClick?.(task.name)}
@@ -146,7 +176,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                               {task.name}
                             </span>
                           </div>
-                          <span className="text-[10px] text-slate-400 mt-0.5">{task.category}</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5 truncate">{task.category}</span>
                         </div>
 
                         {/* Day Columns */}
@@ -200,10 +230,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
               </div>
 
               {/* Totals Row - Sticky Bottom */}
-              <div className="bg-slate-50 border-t border-slate-200 sticky bottom-0 z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]" style={gridStyle}>
-                 <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50 sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
+              <div className="bg-slate-50 border-t border-slate-200 sticky bottom-0 z-30 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]" style={gridStyle}>
+                 {/* Frozen Footer Corner */}
+                 <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50 sticky left-0 z-40 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
                    Total Hours
                  </div>
+                 {/* Total Cells */}
                  {dailyTotals.map((total, i) => (
                    <div key={i} className={`p-3 text-center border-l border-slate-100 ${isToday(days[i]) ? 'bg-amber-50' : 'bg-slate-50'}`}>
                      <span className={`text-sm font-bold block ${total > 8 ? 'text-indigo-600' : total > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -213,7 +245,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
                  ))}
               </div>
 
-            </div>
           </div>
         </div>
       </div>

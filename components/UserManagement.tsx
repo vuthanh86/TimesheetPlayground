@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, Trash2, Shield, UserPlus, Search, Edit2 } from 'lucide-react';
 import { User as UserType } from '../types';
@@ -55,7 +56,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onEdi
         </div>
         <button 
           onClick={handleAddClick}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
         >
           <UserPlus className="w-4 h-4" />
           Add User
@@ -78,7 +79,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onAddUser, onEdi
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold ring-2 ring-white shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold ring-2 ring-white shadow-sm shrink-0">
                         {user.avatar ? <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" /> : user.name.charAt(0)}
                       </div>
                       <div>
