@@ -52,8 +52,6 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
               </tr>
             ) : (
               entries.map((entry) => {
-                // Check if this row has unmet dependencies (for visualization only, logic removed from types but kept visual style if needed in future)
-                // Currently just standard row
                 return (
                   <tr 
                     key={entry.id} 
@@ -91,13 +89,23 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
                     )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span 
-                          onClick={() => onTaskClick && onTaskClick(entry.taskName)}
-                          className={`text-sm font-bold text-slate-700 truncate max-w-[240px] ${onTaskClick ? 'cursor-pointer hover:text-indigo-600 hover:underline' : ''}`} 
-                          title={entry.taskName}
-                        >
-                          {entry.taskName}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span 
+                            onClick={() => onTaskClick && onTaskClick(entry.taskName)}
+                            className={`text-sm font-bold text-slate-700 truncate max-w-[240px] ${onTaskClick ? 'cursor-pointer hover:text-indigo-600 hover:underline' : ''}`} 
+                            title={entry.taskName}
+                          >
+                            {entry.taskName}
+                          </span>
+                          {entry.managerComment && (
+                            <div 
+                              className="text-amber-500 hover:text-amber-600 cursor-help transition-colors"
+                              title={`Manager Comment: ${entry.managerComment}`}
+                            >
+                              <MessageSquare className="w-4 h-4 fill-amber-50" />
+                            </div>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium w-fit ${
                             entry.taskCategory === 'Development' ? 'bg-blue-100 text-blue-800' :
@@ -107,12 +115,6 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
                           }`}>
                             {entry.taskCategory}
                           </span>
-                          {entry.managerComment && (
-                             <div className="flex items-center text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full cursor-help" title={`Manager Comment: ${entry.managerComment}`}>
-                               <MessageSquare className="w-3 h-3 mr-1" />
-                               Comment
-                             </div>
-                          )}
                         </div>
                       </div>
                     </td>
