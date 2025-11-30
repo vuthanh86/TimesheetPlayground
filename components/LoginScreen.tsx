@@ -47,7 +47,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
           </div>
         </div>
 
-        <div className="p-8">
+        <div className="p-6 md:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Username</label>
@@ -98,7 +98,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
 
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-center text-xs text-slate-400 mb-3">Demo Credentials (Password: 123)</p>
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 flex-wrap">
                <button onClick={() => { setUsername('admin'); setPassword('123'); }} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 hover:bg-slate-200 transition-colors">
                   Manager: admin
                </button>

@@ -69,7 +69,10 @@ function App() {
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [filterTaskName, setFilterTaskName] = useState('ALL');
 
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  // UI State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true); // Default collapsed on desktop
+
   const [isLogModalOpen, setLogModalOpen] = useState(false);
   const [isProjectModalOpen, setProjectModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimesheetEntry | null>(null);
@@ -285,7 +288,6 @@ function App() {
     if (!currentUser) return;
     
     // Determine User ID (Editing self or creating for self)
-    // Note: If managers could edit others' time, we'd need to pull userId from editingEntry
     const targetUserId = editingEntry ? editingEntry.userId : currentUser.id;
 
     // 1. Validation: Overlap
@@ -404,7 +406,10 @@ function App() {
     setCurrentDate(newDate);
   };
 
-  // Check if any filter is active for the "Clear" button state
+  // Toggle Sidebar Handlers
+  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const toggleDesktopSidebar = () => setIsDesktopCollapsed(!isDesktopCollapsed);
+
   const isFilterActive = searchQuery !== '' || filterUserId !== 'ALL' || filterCategory !== 'ALL' || filterTaskName !== 'ALL';
 
   if (!isDbReady) {
@@ -422,44 +427,72 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
       
+      {/* Mobile Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20`}>
-        <div className="p-6 flex items-center justify-between">
-          {isSidebarOpen && <h1 className="text-xl font-bold text-indigo-700 tracking-tight">Chrono<span className="text-slate-700">Guard</span></h1>}
-          <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500">
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200 transition-transform duration-300 transform
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:static md:h-screen flex flex-col
+        ${isDesktopCollapsed ? 'md:w-20' : 'md:w-64'}
+      `}>
+        <div className="p-4 md:p-6 flex items-center justify-between shrink-0 h-20">
+          {(!isDesktopCollapsed || isMobileMenuOpen) && (
+            <h1 className="text-xl font-bold text-indigo-700 tracking-tight flex items-center gap-2">
+              <span className="hidden md:inline">Time<span className="text-slate-700">sheet</span></span>
+              <span className="md:hidden">Timesheet</span>
+            </h1>
+          )}
+          {isDesktopCollapsed && !isMobileMenuOpen && (
+             <div className="mx-auto text-indigo-700 font-bold text-xl">TS</div>
+          )}
+          
+          <button onClick={toggleDesktopSidebar} className="hidden md:block p-1.5 hover:bg-slate-100 rounded-lg text-slate-500">
              <Menu className="w-5 h-5" />
+          </button>
+          
+          <button onClick={toggleMobileMenu} className="md:hidden p-1.5 hover:bg-slate-100 rounded-lg text-slate-500">
+             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-3 space-y-2 mt-2 overflow-y-auto">
           <button 
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${view === 'DASHBOARD' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`} 
-            onClick={() => { setView('DASHBOARD'); clearFilters(); }}
+            className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-colors ${view === 'DASHBOARD' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`} 
+            onClick={() => { setView('DASHBOARD'); clearFilters(); setIsMobileMenuOpen(false); }}
+            title="Dashboard"
           >
-            <Home className="w-5 h-5" />
-            {isSidebarOpen && <span>Dashboard</span>}
+            <Home className="w-5 h-5 flex-shrink-0" />
+            {(!isDesktopCollapsed || isMobileMenuOpen) && <span>Dashboard</span>}
           </button>
           
           {currentUser.role === 'Manager' && (
             <div className="pt-2">
               <button 
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${view === 'USERS' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
-                onClick={() => setView('USERS')}
+                className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-colors ${view === 'USERS' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
+                onClick={() => { setView('USERS'); setIsMobileMenuOpen(false); }}
+                title="Team Members"
               >
-                <Users className="w-5 h-5" />
-                {isSidebarOpen && <span>Team Members</span>}
+                <Users className="w-5 h-5 flex-shrink-0" />
+                {(!isDesktopCollapsed || isMobileMenuOpen) && <span>Team Members</span>}
               </button>
             </div>
           )}
         </nav>
         
-        {isSidebarOpen && currentUser.role === 'Manager' && view === 'DASHBOARD' && (
-          <div className="p-4 m-4 bg-indigo-900 rounded-xl text-white">
+        {(!isDesktopCollapsed || isMobileMenuOpen) && currentUser.role === 'Manager' && view === 'DASHBOARD' && (
+          <div className="p-4 m-4 bg-indigo-900 rounded-xl text-white shrink-0">
             <p className="text-xs font-medium text-indigo-200 uppercase mb-2">Dev Tools</p>
             <button 
-              onClick={handleGenerateData} 
+              onClick={() => { handleGenerateData(); setIsMobileMenuOpen(false); }}
               className="w-full bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-colors"
             >
               Generate Mock Data
@@ -469,44 +502,49 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative w-full">
         
         {/* Header */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-          <div className="flex flex-col gap-1">
-             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-               {view === 'DASHBOARD' 
-                 ? (currentUser?.role === 'Manager' ? "Team Dashboard" : "My Dashboard")
-                 : "User Management"
-               }
-             </h2>
-             
-             {/* Date Filters Toolbar (Dashboard Only) */}
+        <header className="bg-white border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-8 py-3 md:h-20 shrink-0 z-10 gap-3">
+          
+          <div className="flex items-center justify-start w-full md:w-auto">
+            <div className="flex items-center gap-3">
+              <button onClick={toggleMobileMenu} className="md:hidden p-2 -ml-2 hover:bg-slate-100 rounded-lg text-slate-600">
+                <Menu className="w-6 h-6" />
+              </button>
+              {view === 'USERS' && (
+                 <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 truncate">
+                   User Management
+                 </h2>
+              )}
+            </div>
+
+             {/* Date Filters Toolbar (Dashboard Only) - Aligned Left */}
              {view === 'DASHBOARD' && (
-               <div className="flex items-center gap-3">
-                 <div className="flex bg-slate-100 p-0.5 rounded-lg">
+               <div className="flex items-center justify-between md:justify-start gap-2 bg-slate-50 md:bg-transparent p-1 md:p-0 rounded-lg">
+                 <div className="flex bg-slate-100 p-0.5 rounded-lg shrink-0">
                     {(['WEEK', 'MONTH', 'RANGE'] as DateFilterMode[]).map(mode => (
                       <button
                         key={mode}
                         onClick={() => setDateFilterMode(mode)}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${dateFilterMode === mode ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-2 md:px-3 py-1 text-[10px] md:text-xs font-bold rounded-md transition-all ${dateFilterMode === mode ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
                         {mode === 'WEEK' ? 'Week' : mode === 'MONTH' ? 'Month' : 'Custom'}
                       </button>
                     ))}
                  </div>
 
-                 <div className="h-4 w-px bg-slate-200"></div>
+                 <div className="h-4 w-px bg-slate-200 hidden md:block"></div>
 
                  {dateFilterMode !== 'RANGE' ? (
-                   <div className="flex items-center gap-2">
+                   <div className="flex items-center gap-1 md:gap-2">
                       <button 
                         className="p-1 rounded-md hover:bg-slate-100 text-slate-500"
                         onClick={handlePrevDate}
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
-                      <span className="text-sm font-semibold text-slate-700 min-w-[120px] text-center">
+                      <span className="text-xs md:text-sm font-semibold text-slate-700 min-w-[90px] md:min-w-[120px] text-center">
                         {formatDateRangeDisplay()}
                       </span>
                       <button 
@@ -517,19 +555,19 @@ function App() {
                       </button>
                    </div>
                  ) : (
-                   <div className="flex items-center gap-2">
+                   <div className="flex items-center gap-1 md:gap-2">
                      <input 
                        type="date" 
                        value={customRange.start} 
                        onChange={(e) => setCustomRange(p => ({ ...p, start: e.target.value }))}
-                       className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                       className="w-24 md:w-auto px-2 py-1 text-xs border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                      />
                      <span className="text-slate-400">-</span>
                      <input 
                        type="date" 
                        value={customRange.end} 
                        onChange={(e) => setCustomRange(p => ({ ...p, end: e.target.value }))}
-                       className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                       className="w-24 md:w-auto px-2 py-1 text-xs border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                      />
                    </div>
                  )}
@@ -537,52 +575,43 @@ function App() {
              )}
           </div>
 
-          <div className="flex items-center space-x-4">
-             {currentUser.role === 'Manager' && view === 'DASHBOARD' && (
-               <button 
-                  onClick={() => setProjectModalOpen(true)}
-                  className="flex items-center space-x-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm active:scale-95"
-                >
-                  <FilePlus2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">New Project</span>
-                </button>
-             )}
-             <button 
-                onClick={() => {
-                   setEditingEntry(null);
-                   setLogModalInitialDate(getLocalDateStr(new Date()));
-                   setLogModalInitialTask('');
-                   setLogModalOpen(true);
-                }}
-                className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Log Time</span>
-              </button>
-             
-             <div className="h-8 w-px bg-slate-200 mx-2"></div>
+          <div className="flex flex-col md:flex-row gap-3 md:items-center">
+             <div className="flex items-center justify-end gap-2 md:gap-4 border-t md:border-t-0 border-slate-100 pt-2 md:pt-0">
+                {currentUser.role === 'Manager' && view === 'DASHBOARD' && (
+                  <button 
+                      onClick={() => setProjectModalOpen(true)}
+                      className="flex items-center space-x-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors shadow-sm active:scale-95"
+                    >
+                      <FilePlus2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">New Task</span>
+                    </button>
+                )}
+                {/* Log Time Button Removed */}
+                
+                <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
-             <div className="flex items-center gap-3 pl-2">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold text-slate-800 leading-none">{currentUser.name}</p>
-                  <p className="text-xs text-slate-500 mt-1 uppercase font-semibold tracking-wider">{currentUser.role}</p>
+                <div className="flex items-center gap-2 pl-1">
+                    <div className="text-right hidden lg:block">
+                      <p className="text-sm font-bold text-slate-800 leading-none">{currentUser.name}</p>
+                      <p className="text-[10px] text-slate-500 mt-1 uppercase font-semibold tracking-wider">{currentUser.role}</p>
+                    </div>
+                    <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm shrink-0">
+                      {currentUser.name.charAt(0)}
+                    </div>
+                    <button 
+                      onClick={handleLogout}
+                      className="p-1.5 md:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Sign Out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
                 </div>
-                <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
-                  {currentUser.name.charAt(0)}
-                </div>
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
              </div>
           </div>
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-slate-50/50">
           
           {view === 'USERS' ? (
             <UserManagement 
@@ -597,90 +626,93 @@ function App() {
             <div className="space-y-6">
                 
                 {/* Advanced Filter Bar */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap gap-4 items-center animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center gap-2 text-slate-500 font-medium text-sm border-r border-slate-200 pr-4 mr-2">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row flex-wrap gap-4 md:items-center">
+                  <div className="flex items-center gap-2 text-slate-500 font-medium text-sm border-b md:border-b-0 md:border-r border-slate-200 pb-2 md:pb-0 md:pr-4 md:mr-2">
                     <Filter className="w-4 h-4" />
                     Filters
                   </div>
 
                   {/* Search */}
-                  <div className="relative group">
+                  <div className="relative group w-full md:w-auto">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500" />
                      <input 
                        type="text" 
                        placeholder="Search tasks..." 
                        value={searchQuery}
                        onChange={(e) => setSearchQuery(e.target.value)}
-                       className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-48 transition-all"
+                       className="w-full md:w-48 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                      />
                   </div>
 
-                  {/* User Filter (Manager Only) */}
-                  {currentUser.role === 'Manager' && (
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        <UserIcon className="w-4 h-4" />
+                  {/* Filter Group - Grid on mobile, flex on desktop */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:items-center gap-4 w-full md:w-auto">
+                      {/* User Filter (Manager Only) */}
+                      {currentUser.role === 'Manager' && (
+                        <div className="relative w-full md:w-auto">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                            <UserIcon className="w-4 h-4" />
+                          </div>
+                          <select 
+                            value={filterUserId}
+                            onChange={(e) => setFilterUserId(e.target.value)}
+                            className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px]"
+                          >
+                            <option value="ALL">All Employees</option>
+                            {users.filter(u => u.role === 'Employee').map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Category Filter */}
+                      <div className="relative w-full md:w-auto">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                          <Tag className="w-4 h-4" />
+                        </div>
+                        <select 
+                          value={filterCategory}
+                          onChange={(e) => setFilterCategory(e.target.value)}
+                          className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px]"
+                        >
+                          <option value="ALL">All Categories</option>
+                          {uniqueCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
                       </div>
-                      <select 
-                        value={filterUserId}
-                        onChange={(e) => setFilterUserId(e.target.value)}
-                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px]"
-                      >
-                        <option value="ALL">All Employees</option>
-                        {users.filter(u => u.role === 'Employee').map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
-                  {/* Category Filter */}
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      <Tag className="w-4 h-4" />
-                    </div>
-                    <select 
-                      value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px]"
-                    >
-                      <option value="ALL">All Categories</option>
-                      {uniqueCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                   {/* Project / Task Filter */}
-                   <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      <Layers className="w-4 h-4" />
-                    </div>
-                    <select 
-                      value={filterTaskName}
-                      onChange={(e) => setFilterTaskName(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer min-w-[140px] max-w-[200px]"
-                    >
-                      <option value="ALL">All Projects</option>
-                      {uniqueTaskNames.map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
+                      {/* Project / Task Filter */}
+                      <div className="relative w-full md:w-auto">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <select 
+                          value={filterTaskName}
+                          onChange={(e) => setFilterTaskName(e.target.value)}
+                          className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px] md:max-w-[200px] truncate"
+                        >
+                          <option value="ALL">All Projects</option>
+                          {uniqueTaskNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
                   </div>
 
                   {isFilterActive && (
                     <button 
                       onClick={clearFilters}
-                      className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="ml-auto w-full md:w-auto flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-dashed border-slate-300 md:border-transparent"
                     >
                       <X className="w-4 h-4" />
-                      Clear
+                      Clear Filters
                     </button>
                   )}
                 </div>
 
                 {/* Row 1: High Level Stats (KPIS) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   <StatsCard 
                     title="Daily Hours (Today)" 
                     value={`${kpiStats.daily.toFixed(1)}h`} 
@@ -706,7 +738,7 @@ function App() {
                 </div>
 
                 {/* Row 2: Charts (Contextual to Filter) */}
-                <div className="w-full">
+                <div className="w-full overflow-hidden">
                   {/* Gantt Chart */}
                     <GanttChart 
                       entries={filteredEntries} 
@@ -720,7 +752,7 @@ function App() {
                 </div>
 
                 {/* Row 3: Recent Activity */}
-                <div className="w-full">
+                <div className="w-full overflow-hidden">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-slate-800 text-lg">
                         Activity Log

@@ -96,8 +96,8 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
   const isManager = currentUser?.role === 'Manager';
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center backdrop-blur-sm p-4 transition-opacity">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center backdrop-blur-sm p-0 md:p-4 transition-opacity">
+      <div className="bg-white w-full h-[90vh] md:h-auto md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
@@ -111,18 +111,18 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
             onClick={onClose} 
             className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
         
-        <div className="overflow-y-auto p-6 flex-1">
+        <div className="overflow-y-auto p-6 flex-1 bg-white">
           {isReadOnly && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-2 text-xs text-amber-700">
               <Lock className="w-4 h-4" />
               Viewing employee entry. You can only add comments.
             </div>
           )}
-          <form id="logTimeForm" onSubmit={handleSubmit} className="space-y-5">
+          <form id="logTimeForm" onSubmit={handleSubmit} className="space-y-5 pb-6">
             
             {/* Date Input */}
             <div>
@@ -135,13 +135,13 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   disabled={isReadOnly}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
             {/* Time Range */}
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-2 gap-4 md:gap-5">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Start Time</label>
                 <input 
@@ -150,7 +150,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   disabled={isReadOnly}
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -161,7 +161,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   disabled={isReadOnly}
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -175,7 +175,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   onChange={(e) => setTaskName(e.target.value)}
                   required
                   disabled={isReadOnly}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <option value="" disabled>Select a Task</option>
                   {taskOptions.map(task => (
@@ -194,7 +194,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   disabled={isReadOnly}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <option value="Development">Development</option>
                   <option value="Design">Design</option>
@@ -244,18 +244,18 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="p-6 pt-2 border-t border-slate-100 flex gap-3 flex-shrink-0 bg-white">
+        <div className="p-4 md:p-6 pt-2 border-t border-slate-100 flex gap-3 flex-shrink-0 bg-white pb-safe-area">
           <button 
             type="button" 
             onClick={onClose}
-            className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
+            className="flex-1 py-3 md:py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
           >
             Cancel
           </button>
           <button 
             form="logTimeForm"
             type="submit"
-            className="flex-1 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
+            className="flex-1 py-3 md:py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
           >
             {entryToEdit ? (isReadOnly ? <MessageSquare className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />) : <Clock className="w-4 h-4" />}
             {entryToEdit ? (isReadOnly ? 'Save Comment' : 'Update Entry') : 'Log Time'}

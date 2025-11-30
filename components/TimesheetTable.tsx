@@ -31,7 +31,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[150px]">Date</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[100px]">Hours</th>
               {showUserColumn && (
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[200px]">
                   <div className="flex items-center gap-1">
                     <UserIcon className="w-3 h-3" />
                     <span>Employee</span>
@@ -82,8 +82,8 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
                            >
                              {entry.userName.charAt(0)}
                            </div>
-                           <div className="flex flex-col">
-                             <span className="text-sm font-medium text-slate-700">{entry.userName}</span>
+                           <div className="flex flex-col truncate max-w-[140px]">
+                             <span className="text-sm font-medium text-slate-700 truncate">{entry.userName}</span>
                              <span className="text-[10px] text-slate-400">ID: {entry.userId}</span>
                            </div>
                          </div>

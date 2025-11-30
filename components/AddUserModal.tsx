@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, User, Shield, Type, Edit2 } from 'lucide-react';
 import { User as UserType, UserRole } from '../types';
@@ -41,8 +42,8 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center backdrop-blur-sm p-4 transition-opacity animate-in fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center backdrop-blur-sm p-0 md:p-4 transition-opacity">
+      <div className="bg-white w-full md:w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -60,7 +61,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
             onClick={onClose} 
             className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
         
@@ -75,7 +76,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. John Doe"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
               />
             </div>
           </div>
@@ -90,7 +91,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. jdoe"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
               />
             </div>
           </div>
@@ -102,7 +103,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
               <select 
                 value={role}
                 onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer"
               >
                 <option value="Employee">Employee</option>
                 <option value="Manager">Manager</option>
@@ -113,7 +114,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave, us
           <div className="pt-2">
             <button 
               type="submit"
-              className="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
+              className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
             >
               {userToEdit ? <Edit2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
               {userToEdit ? 'Update User' : 'Create User'}
