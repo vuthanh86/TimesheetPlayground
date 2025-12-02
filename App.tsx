@@ -284,6 +284,23 @@ function App() {
     return (currentTotal + addDuration) > 40;
   };
 
+  const checkTaskLimit = (taskName: string, addDuration: number, excludeId?: string) => {
+     const taskDef = tasks.find(t => t.name === taskName);
+     if (!taskDef || !taskDef.limitHours) return { exceeded: false, limit: 0, current: 0 };
+
+     // Calculate total logged hours for this task across ALL users and dates (Global Project Limit)
+     // Filter out the current entry if editing
+     const totalLogged = entries
+        .filter(e => e.taskName === taskName && e.id !== excludeId)
+        .reduce((sum, e) => sum + e.durationHours, 0);
+      
+     return {
+        exceeded: (totalLogged + addDuration) > taskDef.limitHours,
+        limit: taskDef.limitHours,
+        current: totalLogged
+     };
+  };
+
   const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName' | 'status'>) => {
     if (!currentUser) return;
     
@@ -300,6 +317,20 @@ function App() {
     if (checkWeeklyLimit(targetUserId, entryData.date, entryData.durationHours, editingEntry?.id)) {
       alert("Error: This entry exceeds the 40-hour weekly limit.");
       return;
+    }
+
+    // 3. Validation: Task Estimated Limit
+    const taskCheck = checkTaskLimit(entryData.taskName, entryData.durationHours, editingEntry?.id);
+    if (taskCheck.exceeded) {
+       // Allow user to proceed but warn them (Confirmation)
+       const isConfirmed = window.confirm(
+         `Warning: This entry will exceed the estimated limit for ${entryData.taskName}.\n\n` +
+         `Limit: ${taskCheck.limit}h\n` +
+         `Current Total: ${taskCheck.current.toFixed(1)}h\n` +
+         `New Entry: ${entryData.durationHours.toFixed(1)}h\n\n` +
+         `Do you want to log this as Overtime?`
+       );
+       if (!isConfirmed) return;
     }
 
     if (editingEntry) {
@@ -586,7 +617,6 @@ function App() {
                       <span className="hidden sm:inline">New Task</span>
                     </button>
                 )}
-                {/* Log Time Button Removed */}
                 
                 <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
@@ -743,6 +773,7 @@ function App() {
                     <GanttChart 
                       entries={filteredEntries} 
                       allEntries={entries}
+                      tasks={tasks}
                       startDate={ganttProps.startDate}
                       daysToShow={ganttProps.daysToShow}
                       onTaskClick={(name) => setFilterTaskName(name)} 

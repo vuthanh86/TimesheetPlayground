@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v2'; // Version bumped to force schema update
+const DB_KEY = 'chrono_guard_sqlite_db_v3'; // Version bumped for limitHours schema change
 
 // --- Seed Data Generators ---
 
@@ -23,14 +23,14 @@ const SEED_USERS: User[] = [
 ];
 
 const SEED_TASKS: TaskDefinition[] = [
-  { id: 'PROJ-101', name: 'PROJ-101: Authentication System' },
-  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics' },
-  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings' },
-  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting' },
-  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout' },
+  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', limitHours: 40 },
+  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', limitHours: 20 },
+  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', limitHours: 15 },
+  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', limitHours: 10 },
+  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', limitHours: 25 },
   { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring' },
-  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout' },
-  { id: 'INT-001', name: 'INT-001: Weekly Team Sync' },
+  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', limitHours: 5 },
+  { id: 'INT-001', name: 'INT-001: Weekly Team Sync' }, // No limit
 ];
 
 const generateSeedEntries = (): TimesheetEntry[] => {
@@ -110,7 +110,8 @@ export const initDB = async (): Promise<void> => {
     db.run(`
       CREATE TABLE tasks (
         id TEXT PRIMARY KEY,
-        name TEXT
+        name TEXT,
+        limitHours REAL
       );
     `);
     db.run(`
@@ -175,12 +176,13 @@ export const getTasks = (): TaskDefinition[] => {
   if (res.length === 0) return [];
   return res[0].values.map((row: any[]) => ({
     id: row[0],
-    name: row[1]
+    name: row[1],
+    limitHours: row[2]
   }));
 };
 
 export const addTask = (task: TaskDefinition) => {
-  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?)", [task.id, task.name]);
+  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?)", [task.id, task.name, task.limitHours || null]);
   saveToStorage();
 };
 

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Briefcase, Hash, Type, Plus } from 'lucide-react';
+import { X, Briefcase, Hash, Type, Plus, Clock } from 'lucide-react';
 import { TaskDefinition } from '../types';
 
 interface AddProjectModalProps {
@@ -12,6 +12,7 @@ interface AddProjectModalProps {
 const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSave }) => {
   const [projectCode, setProjectCode] = useState('');
   const [taskName, setTaskName] = useState('');
+  const [limitHours, setLimitHours] = useState('');
 
   if (!isOpen) return null;
 
@@ -22,11 +23,13 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
     
     onSave({
       id: fullId,
-      name: displayName
+      name: displayName,
+      limitHours: limitHours ? parseFloat(limitHours) : undefined
     });
     
     setProjectCode('');
     setTaskName('');
+    setLimitHours('');
     onClose();
   };
 
@@ -79,6 +82,23 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Estimated Time (Hours)</label>
+            <div className="relative group">
+              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+              <input 
+                type="number" 
+                min="0"
+                step="0.5"
+                value={limitHours}
+                onChange={(e) => setLimitHours(e.target.value)}
+                placeholder="Optional: Limit (e.g. 40)"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 ml-1">Leave empty for no limit.</p>
           </div>
 
           <div className="pt-2">

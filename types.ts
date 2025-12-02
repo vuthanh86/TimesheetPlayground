@@ -17,6 +17,7 @@ export interface TimesheetEntry {
 export interface TaskDefinition {
   id: string; // e.g. PROJ-101
   name: string; // e.g. "PROJ-101: Authentication System"
+  limitHours?: number; // Estimated/Max hours for this task
 }
 
 export interface AIAnalysisResult {
