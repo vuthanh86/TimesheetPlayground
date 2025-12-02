@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v3'; // Version bumped for limitHours schema change
+const DB_KEY = 'chrono_guard_sqlite_db_v6'; // Version bumped for Status change (New, InProgress, Done)
 
 // --- Seed Data Generators ---
 
@@ -23,13 +23,13 @@ const SEED_USERS: User[] = [
 ];
 
 const SEED_TASKS: TaskDefinition[] = [
-  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', limitHours: 40 },
-  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', limitHours: 20 },
-  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', limitHours: 15 },
-  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', limitHours: 10 },
-  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', limitHours: 25 },
+  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', estimatedHours: 40, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 5))) }, // Due in 5 days
+  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', estimatedHours: 20, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() - 2))) }, // Overdue by 2 days
+  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', estimatedHours: 15 },
+  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', estimatedHours: 10, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 10))) },
+  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', estimatedHours: 25 },
   { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring' },
-  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', limitHours: 5 },
+  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', estimatedHours: 5, dueDate: getLocalDateStr(new Date()) }, // Due Today
   { id: 'INT-001', name: 'INT-001: Weekly Team Sync' }, // No limit
 ];
 
@@ -48,15 +48,15 @@ const generateSeedEntries = (): TimesheetEntry[] => {
   };
 
   return [
-    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Approved', managerComment: 'Good work on the flow.' },
-    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Approved' },
-    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Approved' },
-    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'Pending' },
-    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'Approved' },
-    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'Pending' },
+    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Done', managerComment: 'Good work on the flow.' },
+    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Done' },
+    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Done' },
+    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'InProgress' },
+    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'InProgress' },
+    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'New' },
     
-    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Approved' },
-    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Approved' },
+    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Done' },
+    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Done' },
   ];
 };
 
@@ -111,7 +111,8 @@ export const initDB = async (): Promise<void> => {
       CREATE TABLE tasks (
         id TEXT PRIMARY KEY,
         name TEXT,
-        limitHours REAL
+        estimatedHours REAL,
+        dueDate TEXT
       );
     `);
     db.run(`
@@ -177,12 +178,13 @@ export const getTasks = (): TaskDefinition[] => {
   return res[0].values.map((row: any[]) => ({
     id: row[0],
     name: row[1],
-    limitHours: row[2]
+    estimatedHours: row[2],
+    dueDate: row[3]
   }));
 };
 
 export const addTask = (task: TaskDefinition) => {
-  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?)", [task.id, task.name, task.limitHours || null]);
+  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?, ?)", [task.id, task.name, task.estimatedHours || null, task.dueDate || null]);
   saveToStorage();
 };
 

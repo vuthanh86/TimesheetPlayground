@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Briefcase, Hash, Type, Plus, Clock } from 'lucide-react';
+import { X, Briefcase, Hash, Type, Plus, Clock, CalendarClock } from 'lucide-react';
 import { TaskDefinition } from '../types';
 
 interface AddProjectModalProps {
@@ -12,7 +12,8 @@ interface AddProjectModalProps {
 const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSave }) => {
   const [projectCode, setProjectCode] = useState('');
   const [taskName, setTaskName] = useState('');
-  const [limitHours, setLimitHours] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
   if (!isOpen) return null;
 
@@ -24,12 +25,14 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
     onSave({
       id: fullId,
       name: displayName,
-      limitHours: limitHours ? parseFloat(limitHours) : undefined
+      estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
+      dueDate: dueDate || undefined
     });
     
     setProjectCode('');
     setTaskName('');
-    setLimitHours('');
+    setEstimatedHours('');
+    setDueDate('');
     onClose();
   };
 
@@ -84,21 +87,34 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Estimated Time (Hours)</label>
-            <div className="relative group">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <input 
-                type="number" 
-                min="0"
-                step="0.5"
-                value={limitHours}
-                onChange={(e) => setLimitHours(e.target.value)}
-                placeholder="Optional: Limit (e.g. 40)"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Est. Hours</label>
+                <div className="relative group">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input 
+                    type="number" 
+                    min="0"
+                    step="0.5"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+                />
+                </div>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1 ml-1">Leave empty for no limit.</p>
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Due Date</label>
+                <div className="relative group">
+                <CalendarClock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input 
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+                />
+                </div>
+            </div>
           </div>
 
           <div className="pt-2">
