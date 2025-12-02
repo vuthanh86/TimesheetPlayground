@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TimesheetEntry } from '../types';
-import { AlertTriangle, Lock, Clock, FileText, User as UserIcon } from 'lucide-react';
+import { TimesheetEntry, TaskDefinition } from '../types';
+import { AlertTriangle, Lock, Clock, FileText, User as UserIcon, AlertCircle } from 'lucide-react';
 
 interface GanttChartProps {
   entries: TimesheetEntry[];
   allEntries?: TimesheetEntry[];
+  tasks?: TaskDefinition[];
   startDate: Date;
   daysToShow?: number;
   onTaskClick?: (taskName: string) => void;
@@ -23,6 +24,7 @@ interface TaskGroup {
 const GanttChart: React.FC<GanttChartProps> = ({ 
   entries, 
   allEntries = [], 
+  tasks: taskDefinitions = [],
   startDate, 
   daysToShow = 7, 
   onTaskClick, 
@@ -30,7 +32,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
   onCellClick,
   onUserClick
 }) => {
-  const [hoveredTooltip, setHoveredTooltip] = useState<{x: number, y: number, entry: TimesheetEntry} | null>(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState<{x: number, y: number, entry: TimesheetEntry, isOvertime?: boolean} | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   // Responsive check
@@ -91,6 +93,47 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return Array.from(userMap.values());
   }, [entries]);
 
+  // Determine which entries are Overtime (chronologically exceeded limit)
+  const overtimeEntryIds = useMemo(() => {
+    const overtimeIds = new Set<string>();
+    
+    // Group all entries by task to calculate total timeline
+    const allTasksMap = allEntries.reduce((acc, entry) => {
+      if (!acc[entry.taskName]) acc[entry.taskName] = [];
+      acc[entry.taskName].push(entry);
+      return acc;
+    }, {} as Record<string, TimesheetEntry[]>);
+
+    Object.keys(allTasksMap).forEach(taskName => {
+      const taskDef = taskDefinitions.find(t => t.name === taskName);
+      if (!taskDef || !taskDef.limitHours) return;
+
+      const limit = taskDef.limitHours;
+      // Sort chronologically: Date, then StartTime
+      const sortedEntries = allTasksMap[taskName].sort((a, b) => {
+        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return a.startTime.localeCompare(b.startTime);
+      });
+
+      let runningTotal = 0;
+      sortedEntries.forEach(entry => {
+        const prevTotal = runningTotal;
+        runningTotal += entry.durationHours;
+        
+        // If we were already at or over limit, this entry is full overtime
+        if (prevTotal >= limit) {
+           overtimeIds.add(entry.id);
+        } else if (runningTotal > limit) {
+           // This entry crosses the threshold. Mark as overtime (danger).
+           overtimeIds.add(entry.id);
+        }
+      });
+    });
+
+    return overtimeIds;
+  }, [allEntries, taskDefinitions]);
+
   // Helper to check if an entry belongs to a specific date
   const getEntriesForDay = (taskEntries: TimesheetEntry[], date: Date) => {
     const dStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -106,6 +149,22 @@ const GanttChart: React.FC<GanttChartProps> = ({
       case 'Testing': return 'bg-emerald-500 border-emerald-600 text-emerald-50';
       default: return 'bg-slate-500 border-slate-600 text-slate-50';
     }
+  };
+
+  // Helper to get limit info for a task
+  const getTaskLimitInfo = (taskName: string) => {
+     const def = taskDefinitions.find(t => t.name === taskName);
+     if (!def || !def.limitHours) return null;
+     
+     const totalLogged = allEntries
+       .filter(e => e.taskName === taskName)
+       .reduce((sum, e) => sum + e.durationHours, 0);
+       
+     return {
+       current: totalLogged,
+       limit: def.limitHours,
+       percentage: Math.min(100, (totalLogged / def.limitHours) * 100)
+     };
   };
 
   // Dynamic Grid Style for variable columns
@@ -170,6 +229,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                    <div className="p-8 text-center text-slate-400 text-sm italic w-full">No activity recorded for this period.</div>
                 ) : (
                   tasks.map((task) => {
+                    const limitInfo = getTaskLimitInfo(task.name);
                     return (
                       <div key={task.name} className="hover:bg-slate-50/50 transition-colors group" style={gridStyle}>
                         {/* Task Name Column - Sticky Left */}
@@ -183,7 +243,26 @@ const GanttChart: React.FC<GanttChartProps> = ({
                               {task.name}
                             </span>
                           </div>
-                          <span className="text-[10px] text-slate-400 mt-0.5 truncate">{task.category}</span>
+                          
+                          <div className="flex items-center justify-between mt-1">
+                             <span className="text-[10px] text-slate-400 truncate">{task.category}</span>
+                             {limitInfo && (
+                                <span 
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${limitInfo.percentage >= 100 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+                                  title={`Budget Usage: ${limitInfo.current.toFixed(1)}h / ${limitInfo.limit}h`}
+                                >
+                                  {limitInfo.current.toFixed(0)}h / {limitInfo.limit}h
+                                </span>
+                             )}
+                          </div>
+                          {limitInfo && (
+                            <div className="h-1 w-full bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                               <div 
+                                 className={`h-full rounded-full ${limitInfo.percentage >= 100 ? 'bg-red-500' : limitInfo.percentage > 80 ? 'bg-amber-400' : 'bg-emerald-400'}`} 
+                                 style={{ width: `${limitInfo.percentage}%` }}
+                               />
+                            </div>
+                          )}
                         </div>
 
                         {/* Day Columns */}
@@ -198,7 +277,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
                               {dayEntries.map(entry => {
                                 // Calculate visual width based on 8h work day, min 15%
                                 const widthPercent = Math.min(100, Math.max(15, (entry.durationHours / 8) * 100));
-                                const colorClass = getCategoryColor(entry.taskCategory);
+                                
+                                // Determine styling based on Overtime Status
+                                const isOvertime = overtimeEntryIds.has(entry.id);
+                                const colorClass = isOvertime 
+                                    ? 'bg-red-500 border-red-600 text-white' 
+                                    : getCategoryColor(entry.taskCategory);
 
                                 return (
                                   <div 
@@ -208,7 +292,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
                                       setHoveredTooltip({
                                         x: rect.left + (rect.width / 2),
                                         y: rect.top,
-                                        entry
+                                        entry,
+                                        isOvertime
                                       });
                                     }}
                                     onMouseLeave={() => setHoveredTooltip(null)}
@@ -223,6 +308,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                                     className={`relative z-0 hover:z-20 mb-1 px-1.5 py-1 rounded-md text-[10px] font-medium shadow-sm border-l-4 ${colorClass} cursor-pointer hover:brightness-95 transition-all hover:scale-105 hover:shadow-lg whitespace-nowrap overflow-hidden flex items-center gap-1`}
                                     style={{ width: `${widthPercent}%` }}
                                   >
+                                    {isOvertime && <AlertTriangle className="w-3 h-3 text-white fill-white/20" />}
                                     {entry.durationHours}h
                                   </div>
                                 );
@@ -263,10 +349,16 @@ const GanttChart: React.FC<GanttChartProps> = ({
           style={{ left: hoveredTooltip.x, top: hoveredTooltip.y }}
         >
           <div className="font-semibold text-slate-100 mb-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-white/50 inline-block"></span>
+            <span className={`w-2 h-2 rounded-full inline-block ${hoveredTooltip.isOvertime ? 'bg-red-500' : 'bg-white/50'}`}></span>
             {hoveredTooltip.entry.taskName}
           </div>
           <div className="space-y-1.5 text-slate-300">
+            {hoveredTooltip.isOvertime && (
+              <div className="flex items-center gap-2 text-red-300 font-bold bg-red-900/30 p-1 rounded">
+                 <AlertTriangle className="w-3 h-3" />
+                 <span>Over Budget (Overtime)</span>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-indigo-200">
                <UserIcon className="w-3 h-3" />
                <span className="font-medium">{hoveredTooltip.entry.userName}</span>
@@ -277,6 +369,19 @@ const GanttChart: React.FC<GanttChartProps> = ({
                 {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({hoveredTooltip.entry.durationHours}h)
               </span>
             </div>
+            {/* Show Limit Context in Tooltip */}
+            {(() => {
+                const limit = getTaskLimitInfo(hoveredTooltip.entry.taskName);
+                if (limit) {
+                  return (
+                    <div className="flex items-center gap-2 text-amber-300 border-t border-slate-700/50 pt-1 mt-1">
+                      <AlertCircle className="w-3 h-3" />
+                      <span>Task Budget: {limit.current.toFixed(1)}h / {limit.limit}h</span>
+                    </div>
+                  );
+                }
+                return null;
+            })()}
             {hoveredTooltip.entry.description && (
               <div className="flex items-start gap-2 pt-1 border-t border-slate-700/50 mt-1">
                 <FileText className="w-3 h-3 mt-0.5 shrink-0" />
