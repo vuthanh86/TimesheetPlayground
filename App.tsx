@@ -359,6 +359,19 @@ function App() {
     setLogModalOpen(true);
   };
 
+  const handleDeleteEntry = (entry: TimesheetEntry) => {
+    // Permission check
+    if (currentUser?.role !== 'Manager' && entry.userId !== currentUser?.id) {
+       alert("You do not have permission to delete this entry.");
+       return;
+    }
+
+    if (window.confirm("Are you sure you want to delete this time entry? This action cannot be undone.")) {
+       DB.deleteTimesheetEntry(entry.id);
+       refreshData();
+    }
+  };
+
   const handleGanttCellClick = (date: Date, taskName?: string) => {
      // Pre-fill modal for new entry
      setEditingEntry(null);
@@ -799,6 +812,7 @@ function App() {
                       allEntries={entries} 
                       onTaskClick={(name) => setFilterTaskName(name)} 
                       onEdit={handleEditEntry}
+                      onDelete={handleDeleteEntry}
                       showUserColumn={currentUser.role === 'Manager'}
                     />
                 </div>
