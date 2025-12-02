@@ -1,23 +1,31 @@
 
 import React from 'react';
 import { TimesheetEntry } from '../types';
-import { Clock, CheckCircle2, Circle, Pencil, User as UserIcon, MessageSquare } from 'lucide-react';
+import { Clock, CheckCircle2, Circle, Pencil, User as UserIcon, MessageSquare, Trash2 } from 'lucide-react';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
   allEntries?: TimesheetEntry[]; // Kept for interface compatibility
   onTaskClick?: (taskName: string) => void;
   onEdit?: (entry: TimesheetEntry) => void;
+  onDelete?: (entry: TimesheetEntry) => void;
   showUserColumn?: boolean;
 }
 
-const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [], onTaskClick, onEdit, showUserColumn = false }) => {
+const TimesheetTable: React.FC<TimesheetTableProps> = ({ 
+  entries, 
+  allEntries = [], 
+  onTaskClick, 
+  onEdit, 
+  onDelete,
+  showUserColumn = false 
+}) => {
   
   // Calculate colSpan dynamically based on visible columns
   const getColSpan = () => {
     let cols = 4; // Date, Hours, Project, Status
     if (showUserColumn) cols += 1;
-    if (onEdit) cols += 1;
+    if (onEdit || onDelete) cols += 1;
     return cols;
   };
 
@@ -40,7 +48,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
               )}
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Project / Task</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[100px]">Status</th>
-              {onEdit && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[80px]">Action</th>}
+              {(onEdit || onDelete) && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[110px]">Action</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -125,15 +133,28 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, allEntries = [
                           <Circle className="w-5 h-5 text-amber-400 mx-auto" />
                        )}
                     </td>
-                    {onEdit && (
+                    {(onEdit || onDelete) && (
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <button 
-                          onClick={() => onEdit(entry)}
-                          className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="Edit Entry"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {onEdit && (
+                            <button 
+                              onClick={() => onEdit(entry)}
+                              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"
+                              title="Edit Entry"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          {onDelete && (
+                            <button 
+                              onClick={() => onDelete(entry)}
+                              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-600 transition-colors"
+                              title="Delete Entry"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

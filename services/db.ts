@@ -228,3 +228,8 @@ export const addTimesheetEntry = (entry: TimesheetEntry) => {
 export const updateTimesheetEntry = (entry: TimesheetEntry) => {
   addTimesheetEntry(entry);
 };
+
+export const deleteTimesheetEntry = (id: string) => {
+  db.run("DELETE FROM timesheets WHERE id = ?", [id]);
+  saveToStorage();
+};
