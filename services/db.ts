@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v3'; // Version bumped for limitHours schema change
+const DB_KEY = 'chrono_guard_sqlite_db_v4'; // Version bumped for limitHours schema change
 
 // --- Seed Data Generators ---
 
@@ -17,20 +17,12 @@ const getLocalDateStr = (d: Date) => {
 };
 
 const SEED_USERS: User[] = [
-  { id: 'm1', username: 'admin', name: 'Sarah Manager', role: 'Manager' },
-  { id: 'u1', username: 'alex', name: 'Alex Dev', role: 'Employee' },
-  { id: 'u2', username: 'jane', name: 'Jane Designer', role: 'Employee' },
+  { id: 'm1', username: 'admin', name: 'Luu Dao', role: 'Manager' },
+  { id: 'u1', username: 'user', name: 'Thanh Vu', role: 'Employee' },
 ];
 
 const SEED_TASKS: TaskDefinition[] = [
-  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', limitHours: 40 },
-  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', limitHours: 20 },
-  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', limitHours: 15 },
-  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', limitHours: 10 },
-  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', limitHours: 25 },
-  { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring' },
-  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', limitHours: 5 },
-  { id: 'INT-001', name: 'INT-001: Weekly Team Sync' }, // No limit
+  { id: 'PMI-EPIC 9', name: 'Task 25349: Implement Migration WCF HttpExternalHost project to WebAPI .NET8', limitHours: 36.5 },
 ];
 
 const generateSeedEntries = (): TimesheetEntry[] => {
@@ -48,15 +40,7 @@ const generateSeedEntries = (): TimesheetEntry[] => {
   };
 
   return [
-    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Approved', managerComment: 'Good work on the flow.' },
-    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Approved' },
-    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Approved' },
-    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'Pending' },
-    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'Approved' },
-    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'Pending' },
-    
-    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Approved' },
-    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Approved' },
+    { id: '1', userId: 'u1', userName: 'Thanh Vu', date: getDateStr(0), startTime: '09:00', endTime: '11:20', durationHours: 2.20, taskName: 'Task 25349: Implement Migration WCF HttpExternalHost project to WebAPI .NET8', taskCategory: 'Development', description: 'Implemented project structure', status: 'Approved'},
   ];
 };
 
