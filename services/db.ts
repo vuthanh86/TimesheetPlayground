@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v4'; // Version bumped for limitHours schema change
+const DB_KEY = 'chrono_guard_sqlite_db_v5'; // Version bumped for limitHours schema change
 
 // --- Seed Data Generators ---
 
@@ -17,7 +17,7 @@ const getLocalDateStr = (d: Date) => {
 };
 
 const SEED_USERS: User[] = [
-  { id: 'm1', username: 'admin', name: 'Luu Dao', role: 'Manager' },
+  { id: 'm1', username: 'admin', name: 'Luu Tran', role: 'Manager' },
   { id: 'u1', username: 'user', name: 'Thanh Vu', role: 'Employee' },
 ];
 
