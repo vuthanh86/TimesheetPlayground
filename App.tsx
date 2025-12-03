@@ -64,7 +64,8 @@ function App() {
   });
 
   // Advanced Filter States
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState(''); // Immediate input value
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(''); // Debounced value for filtering
   const [filterUserId, setFilterUserId] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [filterTaskName, setFilterTaskName] = useState('ALL');
@@ -95,6 +96,17 @@ function App() {
     init();
   }, []);
 
+  // Debounce Search Input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchInputValue);
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchInputValue]);
+
   const refreshData = () => {
     setUsers(DB.getUsers());
     setTasks(DB.getTasks());
@@ -123,14 +135,14 @@ function App() {
     // 3. Task/Project Filter
     if (filterTaskName !== 'ALL' && e.taskName !== filterTaskName) return false;
     
-    // 4. Search Query
-    if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+    // 4. Search Query (Use Debounced Value)
+    if (debouncedSearchQuery) {
+        const q = debouncedSearchQuery.toLowerCase();
         return e.taskName.toLowerCase().includes(q) || e.description.toLowerCase().includes(q) || e.userName.toLowerCase().includes(q);
     }
     
     return true;
-  }, [filterUserId, filterCategory, filterTaskName, searchQuery]);
+  }, [filterUserId, filterCategory, filterTaskName, debouncedSearchQuery]);
 
   // Helper to get ranges based on mode
   const getViewDateRange = useCallback(() => {
@@ -235,7 +247,7 @@ function App() {
     const newEntries = await generateMockTimesheets(getLocalDateStr(currentDate), 5);
     if (newEntries.length > 0) {
       // Add entries to DB
-      newEntries.forEach(entry => DB.addTimesheetEntry(entry));
+      newEntries.forEach(entry => DB.addTimesheetEntry({ ...entry, status: 'New' }));
       refreshData();
     }
   };
@@ -286,7 +298,7 @@ function App() {
 
   const checkTaskLimit = (taskName: string, addDuration: number, excludeId?: string) => {
      const taskDef = tasks.find(t => t.name === taskName);
-     if (!taskDef || !taskDef.limitHours) return { exceeded: false, limit: 0, current: 0 };
+     if (!taskDef || !taskDef.estimatedHours) return { exceeded: false, limit: 0, current: 0 };
 
      // Calculate total logged hours for this task across ALL users and dates (Global Project Limit)
      // Filter out the current entry if editing
@@ -295,8 +307,8 @@ function App() {
         .reduce((sum, e) => sum + e.durationHours, 0);
       
      return {
-        exceeded: (totalLogged + addDuration) > taskDef.limitHours,
-        limit: taskDef.limitHours,
+        exceeded: (totalLogged + addDuration) > taskDef.estimatedHours,
+        limit: taskDef.estimatedHours,
         current: totalLogged
      };
   };
@@ -325,7 +337,7 @@ function App() {
        // Allow user to proceed but warn them (Confirmation)
        const isConfirmed = window.confirm(
          `Warning: This entry will exceed the estimated limit for ${entryData.taskName}.\n\n` +
-         `Limit: ${taskCheck.limit}h\n` +
+         `Estimated Limit: ${taskCheck.limit}h\n` +
          `Current Total: ${taskCheck.current.toFixed(1)}h\n` +
          `New Entry: ${entryData.durationHours.toFixed(1)}h\n\n` +
          `Do you want to log this as Overtime?`
@@ -334,7 +346,8 @@ function App() {
     }
 
     if (editingEntry) {
-      const updatedEntry: TimesheetEntry = { ...editingEntry, ...entryData, status: 'Pending' };
+      // Keep existing status if just editing details, unless specifically changing it (which we don't do here yet)
+      const updatedEntry: TimesheetEntry = { ...editingEntry, ...entryData };
       DB.updateTimesheetEntry(updatedEntry);
       setEditingEntry(null);
     } else {
@@ -342,7 +355,7 @@ function App() {
         id: Date.now().toString(),
         userId: currentUser.id,
         userName: currentUser.name,
-        status: 'Pending',
+        status: 'New', // Default status for new entries
         ...entryData
       };
       DB.addTimesheetEntry(newEntry);
@@ -414,7 +427,8 @@ function App() {
   };
 
   const clearFilters = () => {
-      setSearchQuery('');
+      setSearchInputValue('');
+      setDebouncedSearchQuery('');
       setFilterUserId('ALL');
       setFilterCategory('ALL');
       setFilterTaskName('ALL');
@@ -454,7 +468,7 @@ function App() {
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleDesktopSidebar = () => setIsDesktopCollapsed(!isDesktopCollapsed);
 
-  const isFilterActive = searchQuery !== '' || filterUserId !== 'ALL' || filterCategory !== 'ALL' || filterTaskName !== 'ALL';
+  const isFilterActive = debouncedSearchQuery !== '' || filterUserId !== 'ALL' || filterCategory !== 'ALL' || filterTaskName !== 'ALL';
 
   if (!isDbReady) {
     return (
@@ -669,175 +683,160 @@ function App() {
             <div className="space-y-6">
                 
                 {/* Advanced Filter Bar */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row flex-wrap gap-4 md:items-center">
-                  <div className="flex items-center gap-2 text-slate-500 font-medium text-sm border-b md:border-b-0 md:border-r border-slate-200 pb-2 md:pb-0 md:pr-4 md:mr-2">
-                    <Filter className="w-4 h-4" />
-                    Filters
-                  </div>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+                     <div className="flex items-center gap-2 text-slate-500">
+                        <ListFilter className="w-5 h-5" />
+                        <span className="text-sm font-bold uppercase tracking-wider hidden md:inline">Filters</span>
+                     </div>
+                     <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+                     
+                     <div className="grid grid-cols-2 md:flex flex-1 gap-3">
+                        <div className="relative col-span-2 md:col-span-1 md:min-w-[200px] flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="text" 
+                            placeholder="Search tasks, descriptions..." 
+                            value={searchInputValue}
+                            onChange={(e) => setSearchInputValue(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                          />
+                        </div>
 
-                  {/* Search */}
-                  <div className="relative group w-full md:w-auto">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500" />
-                     <input 
-                       type="text" 
-                       placeholder="Search tasks..." 
-                       value={searchQuery}
-                       onChange={(e) => setSearchQuery(e.target.value)}
-                       className="w-full md:w-48 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                     />
-                  </div>
-
-                  {/* Filter Group - Grid on mobile, flex on desktop */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:items-center gap-4 w-full md:w-auto">
-                      {/* User Filter (Manager Only) */}
-                      {currentUser.role === 'Manager' && (
-                        <div className="relative w-full md:w-auto">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                            <UserIcon className="w-4 h-4" />
+                        {currentUser.role === 'Manager' && (
+                          <div className="relative">
+                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <select 
+                              value={filterUserId}
+                              onChange={(e) => setFilterUserId(e.target.value)}
+                              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
+                            >
+                              <option value="ALL">All Employees</option>
+                              {users.filter(u => u.role === 'Employee').map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                              ))}
+                            </select>
                           </div>
+                        )}
+
+                        <div className="relative">
+                          <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                           <select 
-                            value={filterUserId}
-                            onChange={(e) => setFilterUserId(e.target.value)}
-                            className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px]"
+                            value={filterTaskName}
+                            onChange={(e) => setFilterTaskName(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer max-w-[200px]"
                           >
-                            <option value="ALL">All Employees</option>
-                            {users.filter(u => u.role === 'Employee').map(u => (
-                              <option key={u.id} value={u.id}>{u.name}</option>
+                            <option value="ALL">All Projects</option>
+                            {uniqueTaskNames.map(t => (
+                              <option key={t} value={t}>{t}</option>
                             ))}
                           </select>
                         </div>
-                      )}
-
-                      {/* Category Filter */}
-                      <div className="relative w-full md:w-auto">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                          <Tag className="w-4 h-4" />
+                        
+                        <div className="relative">
+                          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer"
+                          >
+                            <option value="ALL">All Categories</option>
+                            {uniqueCategories.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
                         </div>
-                        <select 
-                          value={filterCategory}
-                          onChange={(e) => setFilterCategory(e.target.value)}
-                          className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px]"
-                        >
-                          <option value="ALL">All Categories</option>
-                          {uniqueCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
+                     </div>
 
-                      {/* Project / Task Filter */}
-                      <div className="relative w-full md:w-auto">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                          <Layers className="w-4 h-4" />
-                        </div>
-                        <select 
-                          value={filterTaskName}
-                          onChange={(e) => setFilterTaskName(e.target.value)}
-                          className="w-full md:w-auto pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer md:min-w-[140px] md:max-w-[200px] truncate"
-                        >
-                          <option value="ALL">All Projects</option>
-                          {uniqueTaskNames.map(name => (
-                            <option key={name} value={name}>{name}</option>
-                          ))}
-                        </select>
-                      </div>
+                     {isFilterActive && (
+                       <button 
+                         onClick={clearFilters}
+                         className="flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+                       >
+                         <X className="w-4 h-4" />
+                         Clear
+                       </button>
+                     )}
                   </div>
-
-                  {isFilterActive && (
-                    <button 
-                      onClick={clearFilters}
-                      className="ml-auto w-full md:w-auto flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-dashed border-slate-300 md:border-transparent"
-                    >
-                      <X className="w-4 h-4" />
-                      Clear Filters
-                    </button>
-                  )}
                 </div>
 
-                {/* Row 1: High Level Stats (KPIS) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                {/* KPI Cards Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <StatsCard 
-                    title="Daily Hours (Today)" 
+                    title={`Logged Today`} 
                     value={`${kpiStats.daily.toFixed(1)}h`} 
-                    trend={kpiStats.daily >= 8 ? "On Track" : "Below Goal"} 
-                    trendUp={kpiStats.daily >= 8} 
+                    trend="vs yesterday" 
                     icon={Clock} 
-                    color="text-blue-600 bg-blue-100" 
+                    color="bg-indigo-500" 
                   />
                   <StatsCard 
-                    title="Weekly Total" 
+                    title="This Week" 
                     value={`${kpiStats.weekly.toFixed(1)}h`} 
-                    trend="Current Week"
-                    trendUp={true} 
                     icon={CalendarDays} 
-                    color="text-indigo-600 bg-indigo-100" 
+                    color="bg-emerald-500" 
                   />
                   <StatsCard 
-                    title="Monthly Total" 
+                    title="This Month" 
                     value={`${kpiStats.monthly.toFixed(1)}h`} 
-                    icon={Calendar} 
-                    color="text-purple-600 bg-purple-100" 
+                    icon={Briefcase} 
+                    color="bg-amber-500" 
                   />
                 </div>
 
-                {/* Row 2: Charts (Contextual to Filter) */}
-                <div className="w-full overflow-hidden">
-                  {/* Gantt Chart */}
-                    <GanttChart 
-                      entries={filteredEntries} 
-                      allEntries={entries}
-                      tasks={tasks}
-                      startDate={ganttProps.startDate}
-                      daysToShow={ganttProps.daysToShow}
-                      onTaskClick={(name) => setFilterTaskName(name)} 
-                      onEntryClick={handleEditEntry}
-                      onCellClick={handleGanttCellClick}
-                      onUserClick={(userId) => setFilterUserId(userId)}
-                    />
-                </div>
+                {/* Gantt Chart Area */}
+                <GanttChart 
+                  entries={filteredEntries} 
+                  allEntries={entries}
+                  tasks={tasks}
+                  startDate={ganttProps.startDate} 
+                  daysToShow={ganttProps.daysToShow}
+                  onTaskClick={(task) => setFilterTaskName(task === filterTaskName ? 'ALL' : task)}
+                  onEntryClick={handleEditEntry}
+                  onCellClick={handleGanttCellClick}
+                  onUserClick={(uid) => setFilterUserId(uid === filterUserId ? 'ALL' : uid)}
+                />
 
-                {/* Row 3: Recent Activity */}
-                <div className="w-full overflow-hidden">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-slate-800 text-lg">
-                        Activity Log
-                      </h3>
-                      <span className="text-xs text-slate-500 font-medium px-2 py-1 bg-slate-100 rounded">
-                        {filteredEntries.length} entries found
-                      </span>
-                    </div>
-                    {/* Pass all entries for dependency checking */}
-                    <TimesheetTable 
-                      entries={filteredEntries} 
-                      allEntries={entries} 
-                      onTaskClick={(name) => setFilterTaskName(name)} 
-                      onEdit={handleEditEntry}
-                      onDelete={handleDeleteEntry}
-                      showUserColumn={currentUser.role === 'Manager'}
-                    />
+                {/* Activity Log Area */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                       <Clock className="w-5 h-5 text-slate-400" />
+                       Activity Log
+                    </h2>
+                  </div>
+                  <TimesheetTable 
+                    entries={filteredEntries} 
+                    allEntries={entries}
+                    tasks={tasks}
+                    onTaskClick={(task) => setFilterTaskName(task === filterTaskName ? 'ALL' : task)}
+                    onEdit={handleEditEntry}
+                    onDelete={handleDeleteEntry}
+                    showUserColumn={currentUser.role === 'Manager'}
+                  />
                 </div>
             </div>
           )}
         </div>
       </main>
 
+      {/* Modals */}
       <LogTimeModal 
-        isOpen={isLogModalOpen}
-        onClose={handleModalClose}
+        isOpen={isLogModalOpen} 
+        onClose={handleModalClose} 
         onSave={handleSaveEntry}
         initialDate={logModalInitialDate}
         initialTaskName={logModalInitialTask}
-        availableTasks={entries}
         taskOptions={tasks}
         entryToEdit={editingEntry}
         currentUser={currentUser}
       />
 
-      <AddProjectModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setProjectModalOpen(false)}
+      <AddProjectModal 
+        isOpen={isProjectModalOpen} 
+        onClose={() => setProjectModalOpen(false)} 
         onSave={handleAddProject}
       />
+
     </div>
   );
 }

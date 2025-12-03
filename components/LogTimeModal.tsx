@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Clock, Calendar, Tag, FileText, Edit2, MessageSquare, Lock } from 'lucide-react';
 import { TimesheetEntry, TaskDefinition, User } from '../types';
 
@@ -14,6 +14,21 @@ interface LogTimeModalProps {
   entryToEdit?: TimesheetEntry | null;
   currentUser: User | null;
 }
+
+// Generate 10-minute interval options (00:00 to 23:50)
+const generateTimeOptions = () => {
+  const options = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 10) {
+      const hour = h.toString().padStart(2, '0');
+      const minute = m.toString().padStart(2, '0');
+      options.push(`${hour}:${minute}`);
+    }
+  }
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
 
 const LogTimeModal: React.FC<LogTimeModalProps> = ({ 
   isOpen, 
@@ -66,6 +81,22 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
       }
     }
   }, [isOpen, entryToEdit, initialDate, initialTaskName, taskOptions]);
+
+  // Merge standard options with current value if it doesn't match (e.g. legacy data 09:05)
+  const startTimeOptions = useMemo(() => {
+    if (startTime && !TIME_OPTIONS.includes(startTime)) {
+        return [...TIME_OPTIONS, startTime].sort();
+    }
+    return TIME_OPTIONS;
+  }, [startTime]);
+
+  const endTimeOptions = useMemo(() => {
+    if (endTime && !TIME_OPTIONS.includes(endTime)) {
+        return [...TIME_OPTIONS, endTime].sort();
+    }
+    return TIME_OPTIONS;
+  }, [endTime]);
+
 
   if (!isOpen) return null;
 
@@ -144,25 +175,42 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
             <div className="grid grid-cols-2 gap-4 md:gap-5">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Start Time</label>
-                <input 
-                  type="time" 
-                  required
-                  disabled={isReadOnly}
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                />
+                <div className="relative group">
+                  <select
+                    required
+                    disabled={isReadOnly}
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                  >
+                     {startTimeOptions.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                     ))}
+                  </select>
+                  {/* Custom Arrow for select */}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">End Time</label>
-                <input 
-                  type="time" 
-                  required
-                  disabled={isReadOnly}
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                />
+                <div className="relative group">
+                  <select
+                    required
+                    disabled={isReadOnly}
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                  >
+                     {endTimeOptions.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                     ))}
+                  </select>
+                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
               </div>
             </div>
 

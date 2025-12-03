@@ -10,14 +10,15 @@ export interface TimesheetEntry {
   taskName: string; // e.g., 'PROJ-101: Login Page'
   taskCategory: string; // e.g., 'Development', 'Meeting', 'Design'
   description: string;
-  status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'New' | 'InProgress' | 'Done';
   managerComment?: string; // Feedback from manager
 }
 
 export interface TaskDefinition {
   id: string; // e.g. PROJ-101
   name: string; // e.g. "PROJ-101: Authentication System"
-  limitHours?: number; // Estimated/Max hours for this task
+  estimatedHours?: number; // Estimated/Max hours for this task
+  dueDate?: string; // YYYY-MM-DD
 }
 
 export interface AIAnalysisResult {

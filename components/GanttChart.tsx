@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TimesheetEntry, TaskDefinition } from '../types';
-import { AlertTriangle, Lock, Clock, FileText, User as UserIcon, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Lock, Clock, FileText, User as UserIcon, AlertCircle, CalendarX, CalendarCheck } from 'lucide-react';
 
 interface GanttChartProps {
   entries: TimesheetEntry[];
@@ -19,7 +19,191 @@ interface TaskGroup {
   name: string;
   category: string;
   entries: TimesheetEntry[];
+  dueDate?: string;
+  isOverdue?: boolean;
 }
+
+// --- SUB-COMPONENTS FOR MEMOIZATION ---
+
+interface GanttRowProps {
+    task: TaskGroup;
+    days: Date[];
+    gridStyle: React.CSSProperties;
+    overtimeEntryIds: Set<string>;
+    onTaskClick?: (taskName: string) => void;
+    onEntryClick?: (entry: TimesheetEntry) => void;
+    onCellClick?: (date: Date, taskName?: string) => void;
+    onHover: (info: any) => void;
+    taskDefinitions: TaskDefinition[];
+    allEntries: TimesheetEntry[];
+}
+
+const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'Development': return 'bg-blue-500 border-blue-600 text-blue-50';
+      case 'Meeting': return 'bg-purple-500 border-purple-600 text-purple-50';
+      case 'Design': return 'bg-pink-500 border-pink-600 text-pink-50';
+      case 'Research': return 'bg-amber-500 border-amber-600 text-amber-50';
+      case 'Testing': return 'bg-emerald-500 border-emerald-600 text-emerald-50';
+      default: return 'bg-slate-500 border-slate-600 text-slate-50';
+    }
+};
+
+const isToday = (d: Date) => {
+    const today = new Date();
+    return d.getDate() === today.getDate() && 
+           d.getMonth() === today.getMonth() && 
+           d.getFullYear() === today.getFullYear();
+};
+
+const GanttTaskRow = React.memo(({ 
+    task, 
+    days, 
+    gridStyle, 
+    overtimeEntryIds, 
+    onTaskClick, 
+    onEntryClick, 
+    onCellClick, 
+    onHover,
+    taskDefinitions,
+    allEntries
+}: GanttRowProps) => {
+
+    const limitInfo = useMemo(() => {
+        const def = taskDefinitions.find(t => t.name === task.name);
+        if (!def || !def.estimatedHours) return null;
+        
+        // This is still slightly expensive if allEntries is massive, 
+        // but it's now localized to this memoized component
+        const totalLogged = allEntries
+          .filter(e => e.taskName === task.name)
+          .reduce((sum, e) => sum + e.durationHours, 0);
+          
+        return {
+          current: totalLogged,
+          limit: def.estimatedHours,
+          percentage: Math.min(100, (totalLogged / def.estimatedHours) * 100)
+        };
+    }, [allEntries, task.name, taskDefinitions]);
+
+    const getEntriesForDay = (taskEntries: TimesheetEntry[], date: Date) => {
+        const dStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+        return taskEntries.filter(e => e.date === dStr);
+    };
+
+    return (
+        <div className="hover:bg-slate-50/50 transition-colors group" style={gridStyle}>
+        {/* Task Name Column - Sticky Left */}
+        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
+            <div className="flex items-start justify-between gap-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+                {task.isOverdue && (
+                    <div title={`Overdue! Due Date: ${task.dueDate}`} className="flex-shrink-0 animate-pulse">
+                        <CalendarX className="w-3.5 h-3.5 text-red-500" />
+                    </div>
+                )}
+                <span 
+                onClick={() => onTaskClick?.(task.name)}
+                className={`text-sm font-medium truncate ${task.isOverdue ? 'text-red-600' : 'text-slate-700'} ${onTaskClick ? 'cursor-pointer hover:underline' : ''}`} 
+                title={task.name}
+                >
+                {task.name}
+                </span>
+            </div>
+            </div>
+            
+            <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center gap-1.5 truncate">
+                <span className="text-[10px] text-slate-400 truncate">{task.category}</span>
+                {task.dueDate && (
+                    <span className={`text-[9px] px-1 rounded flex items-center gap-0.5 ${task.isOverdue ? 'bg-red-50 text-red-600 font-bold' : 'bg-slate-100 text-slate-500'}`}>
+                        {task.isOverdue ? <CalendarX className="w-2 h-2" /> : <CalendarCheck className="w-2 h-2" />}
+                        {new Date(task.dueDate).toLocaleDateString('en-GB', {day: 'numeric', month: 'numeric'})}
+                    </span>
+                )}
+                </div>
+                {limitInfo && (
+                <span 
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-colors ${
+                    limitInfo.percentage >= 100 ? 'bg-red-50 text-red-600 border-red-100' : 
+                    limitInfo.percentage > 85 ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                    'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                    title={`Budget Usage: ${limitInfo.current.toFixed(1)}h / ${limitInfo.limit.toFixed(1)}h`}
+                >
+                    {limitInfo.current.toFixed(1)} / {limitInfo.limit.toFixed(1)}h
+                </span>
+                )}
+            </div>
+            {limitInfo && (
+            <div className="h-2 w-full bg-slate-100 rounded-full mt-2 overflow-hidden shadow-inner" title={`${limitInfo.percentage.toFixed(1)}% Used`}>
+                <div 
+                    className={`h-full rounded-full transition-all duration-500 ease-out shadow-sm ${
+                    limitInfo.percentage >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 
+                    limitInfo.percentage > 85 ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 
+                    'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                    }`} 
+                    style={{ width: `${Math.min(limitInfo.percentage, 100)}%` }}
+                />
+            </div>
+            )}
+        </div>
+
+        {/* Day Columns */}
+        {days.map((day, i) => {
+            const dayEntries = getEntriesForDay(task.entries, day);
+            return (
+            <div 
+                key={i} 
+                onClick={() => onCellClick && onCellClick(day, task.name)}
+                className={`p-1 border-l border-slate-100 relative min-h-[50px] flex flex-col justify-center ${isToday(day) ? 'bg-amber-50/30' : ''} ${onCellClick ? 'cursor-pointer hover:bg-indigo-50/30' : ''}`}
+            >
+                {dayEntries.map(entry => {
+                const widthPercent = Math.min(100, Math.max(15, (entry.durationHours / 8) * 100));
+                
+                const isOvertime = overtimeEntryIds.has(entry.id);
+                const colorClass = isOvertime 
+                    ? 'bg-red-500 border-red-600 text-white' 
+                    : getCategoryColor(entry.taskCategory);
+
+                return (
+                    <div 
+                    key={entry.id}
+                    onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        onHover({
+                            x: rect.left + (rect.width / 2),
+                            y: rect.top,
+                            entry,
+                            isOvertime
+                        });
+                    }}
+                    onMouseLeave={() => onHover(null)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEntryClick) {
+                        onEntryClick(entry);
+                        } else if (onTaskClick) {
+                        onTaskClick(entry.taskName);
+                        }
+                    }}
+                    className={`relative z-0 hover:z-20 mb-1 px-1.5 py-1 rounded-md text-[10px] font-medium shadow-sm border-l-4 ${colorClass} cursor-pointer hover:brightness-95 transition-all hover:scale-105 hover:shadow-lg whitespace-nowrap overflow-hidden flex items-center gap-1`}
+                    style={{ width: `${widthPercent}%` }}
+                    >
+                    {isOvertime && <AlertTriangle className="w-3 h-3 text-white fill-white/20" />}
+                    {entry.durationHours}h
+                    </div>
+                );
+                })}
+            </div>
+            );
+        })}
+        </div>
+    );
+});
+
+
+// --- MAIN COMPONENT ---
 
 const GanttChart: React.FC<GanttChartProps> = ({ 
   entries, 
@@ -43,46 +227,51 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
-  // Helper to compare dates (ignore time)
-  const isToday = (d: Date) => {
-    const today = new Date();
-    return d.getDate() === today.getDate() && 
-           d.getMonth() === today.getMonth() && 
-           d.getFullYear() === today.getFullYear();
-  };
-
   // 1. Generate array of days for the header
-  const days = Array.from({ length: daysToShow }, (_, i) => {
+  const days = useMemo(() => Array.from({ length: daysToShow }, (_, i) => {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     return d;
-  });
+  }), [startDate, daysToShow]);
 
   // 2. Group entries by Task Name
-  const tasksMap = entries.reduce((acc, entry) => {
-    if (!acc[entry.taskName]) {
-      acc[entry.taskName] = {
-        name: entry.taskName,
-        category: entry.taskCategory,
-        entries: []
-      };
-    }
-    acc[entry.taskName].entries.push(entry);
-    return acc;
-  }, {} as Record<string, TaskGroup>);
-
-  const tasks = Object.values(tasksMap) as TaskGroup[];
+  const tasks = useMemo(() => {
+      const tasksMap = entries.reduce((acc, entry) => {
+        if (!acc[entry.taskName]) {
+          const taskDef = taskDefinitions.find(t => t.name === entry.taskName);
+          
+          let isOverdue = false;
+          if (taskDef?.dueDate) {
+            const due = new Date(taskDef.dueDate);
+            due.setHours(23, 59, 59, 999);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            isOverdue = due < today;
+          }
+    
+          acc[entry.taskName] = {
+            name: entry.taskName,
+            category: entry.taskCategory,
+            entries: [],
+            dueDate: taskDef?.dueDate,
+            isOverdue
+          };
+        }
+        acc[entry.taskName].entries.push(entry);
+        return acc;
+      }, {} as Record<string, TaskGroup>);
+    
+      return Object.values(tasksMap);
+  }, [entries, taskDefinitions]);
 
   // 3. Calculate Daily Totals
-  const dailyTotals = days.map(day => {
-    const dateStr = day.toISOString().split('T')[0];
+  const dailyTotals = useMemo(() => days.map(day => {
     const dStr = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') + '-' + String(day.getDate()).padStart(2, '0');
-    
     const daysEntries = entries.filter(e => e.date === dStr);
     return daysEntries.reduce((acc, curr) => acc + curr.durationHours, 0);
-  });
+  }), [days, entries]);
 
-  // Extract unique users involved in these entries
+  // Extract unique users
   const activeUsers = useMemo(() => {
     const userMap = new Map();
     entries.forEach(e => {
@@ -93,11 +282,11 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return Array.from(userMap.values());
   }, [entries]);
 
-  // Determine which entries are Overtime (chronologically exceeded limit)
+  // Determine Overtime IDs
   const overtimeEntryIds = useMemo(() => {
     const overtimeIds = new Set<string>();
     
-    // Group all entries by task to calculate total timeline
+    // Use allEntries to calculate full history context
     const allTasksMap = allEntries.reduce((acc, entry) => {
       if (!acc[entry.taskName]) acc[entry.taskName] = [];
       acc[entry.taskName].push(entry);
@@ -106,10 +295,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
 
     Object.keys(allTasksMap).forEach(taskName => {
       const taskDef = taskDefinitions.find(t => t.name === taskName);
-      if (!taskDef || !taskDef.limitHours) return;
+      if (!taskDef || !taskDef.estimatedHours) return;
 
-      const limit = taskDef.limitHours;
-      // Sort chronologically: Date, then StartTime
+      const limit = taskDef.estimatedHours;
       const sortedEntries = allTasksMap[taskName].sort((a, b) => {
         const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (dateDiff !== 0) return dateDiff;
@@ -121,11 +309,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
         const prevTotal = runningTotal;
         runningTotal += entry.durationHours;
         
-        // If we were already at or over limit, this entry is full overtime
         if (prevTotal >= limit) {
            overtimeIds.add(entry.id);
         } else if (runningTotal > limit) {
-           // This entry crosses the threshold. Mark as overtime (danger).
            overtimeIds.add(entry.id);
         }
       });
@@ -134,45 +320,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return overtimeIds;
   }, [allEntries, taskDefinitions]);
 
-  // Helper to check if an entry belongs to a specific date
-  const getEntriesForDay = (taskEntries: TimesheetEntry[], date: Date) => {
-    const dStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-    return taskEntries.filter(e => e.date === dStr);
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Development': return 'bg-blue-500 border-blue-600 text-blue-50';
-      case 'Meeting': return 'bg-purple-500 border-purple-600 text-purple-50';
-      case 'Design': return 'bg-pink-500 border-pink-600 text-pink-50';
-      case 'Research': return 'bg-amber-500 border-amber-600 text-amber-50';
-      case 'Testing': return 'bg-emerald-500 border-emerald-600 text-emerald-50';
-      default: return 'bg-slate-500 border-slate-600 text-slate-50';
-    }
-  };
-
-  // Helper to get limit info for a task
-  const getTaskLimitInfo = (taskName: string) => {
-     const def = taskDefinitions.find(t => t.name === taskName);
-     if (!def || !def.limitHours) return null;
-     
-     const totalLogged = allEntries
-       .filter(e => e.taskName === taskName)
-       .reduce((sum, e) => sum + e.durationHours, 0);
-       
-     return {
-       current: totalLogged,
-       limit: def.limitHours,
-       percentage: Math.min(100, (totalLogged / def.limitHours) * 100)
-     };
-  };
-
-  // Dynamic Grid Style for variable columns
+  // Dynamic Grid Style
   const taskColWidth = isMobile ? '140px' : '250px';
-  const gridStyle = {
+  const gridStyle = useMemo(() => ({
     display: 'grid',
     gridTemplateColumns: `${taskColWidth} repeat(${daysToShow}, minmax(40px, 1fr))`
-  };
+  }), [taskColWidth, daysToShow]);
 
   return (
     <>
@@ -228,97 +381,21 @@ const GanttChart: React.FC<GanttChartProps> = ({
                 {tasks.length === 0 ? (
                    <div className="p-8 text-center text-slate-400 text-sm italic w-full">No activity recorded for this period.</div>
                 ) : (
-                  tasks.map((task) => {
-                    const limitInfo = getTaskLimitInfo(task.name);
-                    return (
-                      <div key={task.name} className="hover:bg-slate-50/50 transition-colors group" style={gridStyle}>
-                        {/* Task Name Column - Sticky Left */}
-                        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
-                          <div className="flex items-start justify-between gap-1">
-                            <span 
-                              onClick={() => onTaskClick?.(task.name)}
-                              className={`text-sm font-medium text-slate-700 truncate ${onTaskClick ? 'cursor-pointer hover:text-indigo-600 hover:underline' : ''}`} 
-                              title={task.name}
-                            >
-                              {task.name}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between mt-1">
-                             <span className="text-[10px] text-slate-400 truncate">{task.category}</span>
-                             {limitInfo && (
-                                <span 
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${limitInfo.percentage >= 100 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
-                                  title={`Budget Usage: ${limitInfo.current.toFixed(1)}h / ${limitInfo.limit}h`}
-                                >
-                                  {limitInfo.current.toFixed(0)}h / {limitInfo.limit}h
-                                </span>
-                             )}
-                          </div>
-                          {limitInfo && (
-                            <div className="h-1 w-full bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                               <div 
-                                 className={`h-full rounded-full ${limitInfo.percentage >= 100 ? 'bg-red-500' : limitInfo.percentage > 80 ? 'bg-amber-400' : 'bg-emerald-400'}`} 
-                                 style={{ width: `${limitInfo.percentage}%` }}
-                               />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Day Columns */}
-                        {days.map((day, i) => {
-                          const dayEntries = getEntriesForDay(task.entries, day);
-                          return (
-                            <div 
-                              key={i} 
-                              onClick={() => onCellClick && onCellClick(day, task.name)}
-                              className={`p-1 border-l border-slate-100 relative min-h-[50px] flex flex-col justify-center ${isToday(day) ? 'bg-amber-50/30' : ''} ${onCellClick ? 'cursor-pointer hover:bg-indigo-50/30' : ''}`}
-                            >
-                              {dayEntries.map(entry => {
-                                // Calculate visual width based on 8h work day, min 15%
-                                const widthPercent = Math.min(100, Math.max(15, (entry.durationHours / 8) * 100));
-                                
-                                // Determine styling based on Overtime Status
-                                const isOvertime = overtimeEntryIds.has(entry.id);
-                                const colorClass = isOvertime 
-                                    ? 'bg-red-500 border-red-600 text-white' 
-                                    : getCategoryColor(entry.taskCategory);
-
-                                return (
-                                  <div 
-                                    key={entry.id}
-                                    onMouseEnter={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setHoveredTooltip({
-                                        x: rect.left + (rect.width / 2),
-                                        y: rect.top,
-                                        entry,
-                                        isOvertime
-                                      });
-                                    }}
-                                    onMouseLeave={() => setHoveredTooltip(null)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (onEntryClick) {
-                                        onEntryClick(entry);
-                                      } else if (onTaskClick) {
-                                        onTaskClick(entry.taskName);
-                                      }
-                                    }}
-                                    className={`relative z-0 hover:z-20 mb-1 px-1.5 py-1 rounded-md text-[10px] font-medium shadow-sm border-l-4 ${colorClass} cursor-pointer hover:brightness-95 transition-all hover:scale-105 hover:shadow-lg whitespace-nowrap overflow-hidden flex items-center gap-1`}
-                                    style={{ width: `${widthPercent}%` }}
-                                  >
-                                    {isOvertime && <AlertTriangle className="w-3 h-3 text-white fill-white/20" />}
-                                    {entry.durationHours}h
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })
+                  tasks.map((task) => (
+                      <GanttTaskRow 
+                        key={task.name}
+                        task={task}
+                        days={days}
+                        gridStyle={gridStyle}
+                        overtimeEntryIds={overtimeEntryIds}
+                        onTaskClick={onTaskClick}
+                        onEntryClick={onEntryClick}
+                        onCellClick={onCellClick}
+                        onHover={setHoveredTooltip}
+                        taskDefinitions={taskDefinitions}
+                        allEntries={allEntries}
+                      />
+                  ))
                 )}
               </div>
 
@@ -369,16 +446,20 @@ const GanttChart: React.FC<GanttChartProps> = ({
                 {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({hoveredTooltip.entry.durationHours}h)
               </span>
             </div>
-            {/* Show Limit Context in Tooltip */}
+            {/* Show Limit Context in Tooltip - We need to pass logic down or calc here, keeping simple for tooltip */}
             {(() => {
-                const limit = getTaskLimitInfo(hoveredTooltip.entry.taskName);
-                if (limit) {
-                  return (
-                    <div className="flex items-center gap-2 text-amber-300 border-t border-slate-700/50 pt-1 mt-1">
-                      <AlertCircle className="w-3 h-3" />
-                      <span>Task Budget: {limit.current.toFixed(1)}h / {limit.limit}h</span>
-                    </div>
-                  );
+                const def = taskDefinitions.find(t => t.name === hoveredTooltip.entry.taskName);
+                if (def && def.estimatedHours) {
+                    // Quick recalc for tooltip only
+                    const total = allEntries
+                    .filter(e => e.taskName === hoveredTooltip.entry.taskName)
+                    .reduce((sum, e) => sum + e.durationHours, 0);
+                    return (
+                        <div className="flex items-center gap-2 text-amber-300 border-t border-slate-700/50 pt-1 mt-1">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>Task Budget: {total.toFixed(1)}h / {def.estimatedHours.toFixed(1)}h</span>
+                        </div>
+                    );
                 }
                 return null;
             })()}
