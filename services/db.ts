@@ -38,9 +38,11 @@ const generateSeedEntries = (): TimesheetEntry[] => {
     d.setDate(monday.getDate() + offset);
     return getLocalDateStr(d);
   };
-
+  if (db) {
+    return getTimesheets();
+  }
   return [
-    { id: '1', userId: 'u', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Done' },
+    { id: '1', userId: 'u1', userName: 'Thanh Vu', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Done' },
   ];
 };
 

@@ -168,7 +168,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                 return (
                   <tr 
                     key={entry.id} 
-                    className="transition-colors group hover:bg-slate-50"
+                    className={`transition-colors group ${isOvertime ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-3">
