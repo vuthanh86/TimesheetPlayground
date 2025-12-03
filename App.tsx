@@ -150,16 +150,18 @@ function App() {
     let end = new Date(currentDate);
 
     if (dateFilterMode === 'WEEK') {
+        // Enforce Mon-Sun logic (7 days)
         const day = start.getDay();
         const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
         start.setDate(diff);
         end = new Date(start);
-        end.setDate(start.getDate() + 6);
+        end.setDate(start.getDate() + 6); // Monday + 6 = Sunday
     } else if (dateFilterMode === 'MONTH') {
+        // Enforce 1st to Last Day of Month
         start.setDate(1);
         end = new Date(start);
         end.setMonth(end.getMonth() + 1);
-        end.setDate(0); // Last day of month
+        end.setDate(0); // Last day of selected month
     } else {
         // RANGE
         start = new Date(customRange.start);
@@ -225,8 +227,9 @@ function App() {
   // Gantt Props
   const ganttProps = useMemo(() => {
      const { start, end } = getViewDateRange();
+     // Calculate exact days inclusive
      const diffTime = Math.abs(end.getTime() - start.getTime());
-     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to be inclusive of end date
      return { startDate: start, daysToShow: diffDays };
   }, [getViewDateRange]);
 
@@ -313,7 +316,7 @@ function App() {
      };
   };
 
-  const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName' | 'status'>) => {
+  const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>) => {
     if (!currentUser) return;
     
     // Determine User ID (Editing self or creating for self)
@@ -331,7 +334,7 @@ function App() {
       return;
     }
 
-    // 3. Validation: Task Estimated Limit
+    // 3. Validation: Task Estimated Limit (Overtime is ALLOWED with Warning)
     const taskCheck = checkTaskLimit(entryData.taskName, entryData.durationHours, editingEntry?.id);
     if (taskCheck.exceeded) {
        // Allow user to proceed but warn them (Confirmation)
@@ -346,7 +349,6 @@ function App() {
     }
 
     if (editingEntry) {
-      // Keep existing status if just editing details, unless specifically changing it (which we don't do here yet)
       const updatedEntry: TimesheetEntry = { ...editingEntry, ...entryData };
       DB.updateTimesheetEntry(updatedEntry);
       setEditingEntry(null);
@@ -355,7 +357,6 @@ function App() {
         id: Date.now().toString(),
         userId: currentUser.id,
         userName: currentUser.name,
-        status: 'New', // Default status for new entries
         ...entryData
       };
       DB.addTimesheetEntry(newEntry);
@@ -450,6 +451,7 @@ function App() {
         newDate.setDate(newDate.getDate() + 7);
     } else if (dateFilterMode === 'MONTH') {
         newDate.setMonth(newDate.getMonth() + 1);
+        newDate.setDate(1); // Ensure we start at 1st to avoid skipping short months
     }
     setCurrentDate(newDate);
   };
@@ -460,6 +462,7 @@ function App() {
         newDate.setDate(newDate.getDate() - 7);
     } else if (dateFilterMode === 'MONTH') {
         newDate.setMonth(newDate.getMonth() - 1);
+        newDate.setDate(1);
     }
     setCurrentDate(newDate);
   };
