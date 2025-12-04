@@ -39,6 +39,8 @@ import TaskManagement from './components/TaskManagement';
 import NotificationDropdown, { SystemNotification } from './components/NotificationDropdown';
 import { generateMockTimesheets } from './services/geminiService';
 import * as DB from './services/db';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Helper for local date string YYYY-MM-DD
 const getLocalDateStr = (d: Date) => {
