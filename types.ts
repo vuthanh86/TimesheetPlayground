@@ -1,4 +1,6 @@
 
+export type TaskStatus = 'ToDo' | 'InProgress' | 'Done';
+
 export interface TimesheetEntry {
   id: string;
   userId: string;
@@ -10,7 +12,6 @@ export interface TimesheetEntry {
   taskName: string; // e.g., 'PROJ-101: Login Page'
   taskCategory: string; // e.g., 'Development', 'Meeting', 'Design'
   description: string;
-  status: 'New' | 'InProgress' | 'Done';
   managerComment?: string; // Feedback from manager
 }
 
@@ -19,6 +20,7 @@ export interface TaskDefinition {
   name: string; // e.g. "PROJ-101: Authentication System"
   estimatedHours?: number; // Estimated/Max hours for this task
   dueDate?: string; // YYYY-MM-DD
+  status: TaskStatus;
 }
 
 export interface AIAnalysisResult {

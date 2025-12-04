@@ -1,38 +1,78 @@
 
-import React, { useState } from 'react';
-import { X, Briefcase, Hash, Type, Plus, Clock, CalendarClock } from 'lucide-react';
-import { TaskDefinition } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Briefcase, Hash, Type, Plus, Clock, CalendarClock, Activity, Edit2 } from 'lucide-react';
+import { TaskDefinition, TaskStatus } from '../types';
 
 interface AddProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (task: TaskDefinition) => void;
+  taskToEdit?: TaskDefinition | null;
 }
 
-const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSave }) => {
+const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSave, taskToEdit }) => {
   const [projectCode, setProjectCode] = useState('');
   const [taskName, setTaskName] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [status, setStatus] = useState<TaskStatus>('ToDo');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (taskToEdit) {
+        // Parse ID and Name from composite string "ID: Name"
+        const separatorIndex = taskToEdit.name.indexOf(': ');
+        let code = taskToEdit.id;
+        let name = taskToEdit.name;
+        
+        // If the stored name format matches our generator "ID: Name", try to split for display
+        if (separatorIndex !== -1 && taskToEdit.name.startsWith(taskToEdit.id)) {
+             code = taskToEdit.id;
+             name = taskToEdit.name.substring(separatorIndex + 2);
+        }
+
+        setProjectCode(code);
+        setTaskName(name);
+        setEstimatedHours(taskToEdit.estimatedHours ? taskToEdit.estimatedHours.toString() : '');
+        setDueDate(taskToEdit.dueDate || '');
+        setStatus(taskToEdit.status || 'ToDo');
+      } else {
+        setProjectCode('');
+        setTaskName('');
+        setEstimatedHours('');
+        setDueDate('');
+        setStatus('ToDo');
+      }
+    }
+  }, [isOpen, taskToEdit]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const fullId = projectCode.toUpperCase();
+    
+    // Construct display name. If user edited the code, the name should reflect it.
+    // If editing, we keep the original ID if we treat it as immutable, but for now we allow overwrite since ID is PK.
+    // Ideally PK shouldn't change, but simpler here to just save.
+    
     const displayName = `${fullId}: ${taskName}`;
     
     onSave({
       id: fullId,
       name: displayName,
       estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
-      dueDate: dueDate || undefined
+      dueDate: dueDate || undefined,
+      status: status
     });
     
-    setProjectCode('');
-    setTaskName('');
-    setEstimatedHours('');
-    setDueDate('');
+    if (!taskToEdit) {
+       setProjectCode('');
+       setTaskName('');
+       setEstimatedHours('');
+       setDueDate('');
+       setStatus('ToDo');
+    }
     onClose();
   };
 
@@ -44,9 +84,9 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <div className="p-1.5 bg-indigo-100 rounded-lg">
-              <Briefcase className="w-5 h-5 text-indigo-600" />
+              {taskToEdit ? <Edit2 className="w-5 h-5 text-indigo-600" /> : <Briefcase className="w-5 h-5 text-indigo-600" />}
             </div>
-            Add New Project
+            {taskToEdit ? 'Edit Task' : 'Add New Task'}
           </h2>
           <button 
             onClick={onClose} 
@@ -58,7 +98,7 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
         
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Project Code / ID</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Task ID / Code</label>
             <div className="relative group">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input 
@@ -67,9 +107,11 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
                 value={projectCode}
                 onChange={(e) => setProjectCode(e.target.value)}
                 placeholder="e.g. PROJ-200"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 uppercase placeholder:normal-case"
+                readOnly={!!taskToEdit} // Prevent changing ID when editing to maintain ref integrity
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 uppercase placeholder:normal-case read-only:opacity-60 read-only:cursor-not-allowed"
               />
             </div>
+            {taskToEdit && <p className="text-[10px] text-slate-400 mt-1 pl-1">ID cannot be changed once created.</p>}
           </div>
 
           <div>
@@ -117,13 +159,29 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
             </div>
           </div>
 
+          <div>
+             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Initial Status</label>
+             <div className="relative group">
+               <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+               <select 
+                 value={status}
+                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer"
+               >
+                 <option value="ToDo">To Do</option>
+                 <option value="InProgress">In Progress</option>
+                 <option value="Done">Done</option>
+               </select>
+             </div>
+          </div>
+
           <div className="pt-2">
             <button 
               type="submit"
               className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg hover:shadow-indigo-500/20 text-sm flex items-center justify-center gap-2"
             >
-              <Plus className="w-4 h-4" />
-              Add Project
+              {taskToEdit ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {taskToEdit ? 'Update Task' : 'Add Task'}
             </button>
           </div>
         </form>

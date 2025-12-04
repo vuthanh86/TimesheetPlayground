@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -21,9 +21,13 @@ import {
   User as UserIcon,
   Tag,
   Layers,
-  Database
+  Database,
+  CheckSquare,
+  Bell,
+  Download,
+  Upload
 } from 'lucide-react';
-import { TimesheetEntry, TaskDefinition, User } from './types';
+import { TimesheetEntry, TaskDefinition, User, TaskStatus } from './types';
 import StatsCard from './components/StatsCard';
 import TimesheetTable from './components/TimesheetTable';
 import LogTimeModal from './components/LogTimeModal';
@@ -31,6 +35,8 @@ import AddProjectModal from './components/AddProjectModal';
 import LoginScreen from './components/LoginScreen';
 import GanttChart from './components/GanttChart';
 import UserManagement from './components/UserManagement';
+import TaskManagement from './components/TaskManagement';
+import NotificationDropdown, { SystemNotification } from './components/NotificationDropdown';
 import { generateMockTimesheets } from './services/geminiService';
 import * as DB from './services/db';
 
@@ -40,7 +46,7 @@ const getLocalDateStr = (d: Date) => {
 };
 
 type DateFilterMode = 'WEEK' | 'MONTH' | 'RANGE';
-type ViewType = 'DASHBOARD' | 'USERS';
+type ViewType = 'DASHBOARD' | 'USERS' | 'TASKS';
 
 function App() {
   // DB Loading State
@@ -73,11 +79,15 @@ function App() {
   // UI State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true); // Default collapsed on desktop
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const [isLogModalOpen, setLogModalOpen] = useState(false);
   const [isProjectModalOpen, setProjectModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimesheetEntry | null>(null);
+  const [editingTask, setEditingTask] = useState<TaskDefinition | null>(null); // For Task Management
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // State for pre-filling modal from Gantt click
   const [logModalInitialDate, setLogModalInitialDate] = useState<string>(getLocalDateStr(new Date()));
   const [logModalInitialTask, setLogModalInitialTask] = useState<string>('');
@@ -193,10 +203,8 @@ function App() {
     return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [accessibleEntries, getViewDateRange, matchesFilters, currentUser]);
 
-  // Dashboard KPI Stats (Daily/Weekly/Monthly relative to current cursor)
-  // NOW RESPECTS ATTRIBUTE FILTERS (e.g. if User=Alex selected, stats show Alex's hours)
+  // Dashboard KPI Stats
   const kpiStats = useMemo(() => {
-    // Base set of entries to calculate stats from (all time, but filtered by user/category/etc)
     const attributeFiltered = accessibleEntries.filter(matchesFilters);
 
     const dateStr = getLocalDateStr(currentDate);
@@ -204,7 +212,6 @@ function App() {
         start: new Date(currentDate), 
         end: new Date(currentDate) 
     };
-    // Re-calc simple week for KPI
     const day = weekStart.getDay();
     const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
     weekStart.setDate(diff);
@@ -227,11 +234,59 @@ function App() {
   // Gantt Props
   const ganttProps = useMemo(() => {
      const { start, end } = getViewDateRange();
-     // Calculate exact days inclusive
      const diffTime = Math.abs(end.getTime() - start.getTime());
-     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to be inclusive of end date
+     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
      return { startDate: start, daysToShow: diffDays };
   }, [getViewDateRange]);
+
+  // --- NOTIFICATION LOGIC (Manager Only) ---
+  const notifications = useMemo(() => {
+    if (currentUser?.role !== 'Manager') return [];
+    
+    const alerts: SystemNotification[] = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    tasks.forEach(task => {
+        // 1. Check Overdue
+        // Condition: Due Date exists, Due Date < Today, Status != Done
+        if (task.dueDate && task.status !== 'Done') {
+            const due = new Date(task.dueDate);
+            due.setHours(0,0,0,0);
+            
+            if (due < today) {
+                alerts.push({
+                    id: `overdue-${task.id}`,
+                    type: 'OVERDUE',
+                    title: 'Task Overdue',
+                    message: `Task "${task.name}" was due on ${task.dueDate} and is not yet done.`,
+                    severity: 'high'
+                });
+            }
+        }
+
+        // 2. Check Overtime (Over Estimate)
+        // Condition: Estimated Hours exists, Total Logged > Estimate
+        if (task.estimatedHours) {
+            const totalLogged = entries
+                .filter(e => e.taskName === task.name)
+                .reduce((sum, e) => sum + e.durationHours, 0);
+
+            if (totalLogged > task.estimatedHours) {
+                const overage = (totalLogged - task.estimatedHours).toFixed(1);
+                alerts.push({
+                    id: `overtime-${task.id}`,
+                    type: 'OVERTIME',
+                    title: 'Budget Exceeded',
+                    message: `Task "${task.name}" is ${overage}h over its estimated budget of ${task.estimatedHours}h.`,
+                    severity: 'medium'
+                });
+            }
+        }
+    });
+
+    return alerts;
+  }, [tasks, entries, currentUser]);
 
 
   // Handlers
@@ -249,15 +304,56 @@ function App() {
     if (currentUser?.role !== 'Manager') return;
     const newEntries = await generateMockTimesheets(getLocalDateStr(currentDate), 5);
     if (newEntries.length > 0) {
-      // Add entries to DB
-      newEntries.forEach(entry => DB.addTimesheetEntry({ ...entry, status: 'New' }));
+      newEntries.forEach(entry => DB.addTimesheetEntry(entry));
       refreshData();
     }
   };
+  
+  // --- EXPORT / IMPORT DB HANDLERS ---
+  const handleExportDB = () => {
+    const sql = DB.exportDatabaseSQL();
+    const blob = new Blob([sql], { type: 'application/sql' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chronoguard_backup_${new Date().toISOString().slice(0,10)}.sql`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    if (fileInputRef.current) {
+        fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const sql = event.target?.result as string;
+          if (sql) {
+              try {
+                  DB.importDatabaseSQL(sql);
+                  refreshData();
+                  alert("Database imported successfully!");
+              } catch (err) {
+                  alert("Failed to import database. Please check the file format.");
+              }
+          }
+      };
+      reader.readAsText(file);
+      // Reset input
+      e.target.value = '';
+  };
+
 
   // --- VALIDATION HELPERS ---
   const checkOverlap = (userId: string, date: string, start: string, end: string, excludeId?: string) => {
-    // Convert HH:mm to minutes
     const toMins = (t: string) => {
       const [h, m] = t.split(':').map(Number);
       return h * 60 + m;
@@ -270,7 +366,6 @@ function App() {
     return userEntries.some(e => {
       const eStart = toMins(e.startTime);
       const eEnd = toMins(e.endTime);
-      // Overlap condition: (StartA < EndB) and (EndA > StartB)
       return newStart < eEnd && newEnd > eStart;
     });
   };
@@ -278,7 +373,7 @@ function App() {
   const checkWeeklyLimit = (userId: string, dateStr: string, addDuration: number, excludeId?: string) => {
     const d = new Date(dateStr);
     const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const weekStart = new Date(d);
     weekStart.setDate(diff);
     weekStart.setHours(0,0,0,0);
@@ -303,8 +398,6 @@ function App() {
      const taskDef = tasks.find(t => t.name === taskName);
      if (!taskDef || !taskDef.estimatedHours) return { exceeded: false, limit: 0, current: 0 };
 
-     // Calculate total logged hours for this task across ALL users and dates (Global Project Limit)
-     // Filter out the current entry if editing
      const totalLogged = entries
         .filter(e => e.taskName === taskName && e.id !== excludeId)
         .reduce((sum, e) => sum + e.durationHours, 0);
@@ -319,25 +412,20 @@ function App() {
   const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>) => {
     if (!currentUser) return;
     
-    // Determine User ID (Editing self or creating for self)
     const targetUserId = editingEntry ? editingEntry.userId : currentUser.id;
 
-    // 1. Validation: Overlap
     if (checkOverlap(targetUserId, entryData.date, entryData.startTime, entryData.endTime, editingEntry?.id)) {
       alert("Error: Time entry overlaps with an existing entry.");
       return;
     }
 
-    // 2. Validation: 40 Hours Limit
     if (checkWeeklyLimit(targetUserId, entryData.date, entryData.durationHours, editingEntry?.id)) {
       alert("Error: This entry exceeds the 40-hour weekly limit.");
       return;
     }
 
-    // 3. Validation: Task Estimated Limit (Overtime is ALLOWED with Warning)
     const taskCheck = checkTaskLimit(entryData.taskName, entryData.durationHours, editingEntry?.id);
     if (taskCheck.exceeded) {
-       // Allow user to proceed but warn them (Confirmation)
        const isConfirmed = window.confirm(
          `Warning: This entry will exceed the estimated limit for ${entryData.taskName}.\n\n` +
          `Estimated Limit: ${taskCheck.limit}h\n` +
@@ -374,7 +462,6 @@ function App() {
   };
 
   const handleDeleteEntry = (entry: TimesheetEntry) => {
-    // Permission check
     if (currentUser?.role !== 'Manager' && entry.userId !== currentUser?.id) {
        alert("You do not have permission to delete this entry.");
        return;
@@ -387,7 +474,6 @@ function App() {
   };
 
   const handleGanttCellClick = (date: Date, taskName?: string) => {
-     // Pre-fill modal for new entry
      setEditingEntry(null);
      setLogModalInitialDate(getLocalDateStr(date));
      setLogModalInitialTask(taskName || '');
@@ -399,12 +485,35 @@ function App() {
     setEditingEntry(null);
   };
 
-  const handleAddProject = (newTask: TaskDefinition) => {
+  // --- TASK MANAGEMENT HANDLERS ---
+  const handleSaveTask = (newTask: TaskDefinition) => {
     if (currentUser?.role !== 'Manager') return;
     DB.addTask(newTask);
     refreshData();
   };
 
+  const handleEditTask = (task: TaskDefinition) => {
+    setEditingTask(task);
+    setProjectModalOpen(true);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (currentUser?.role !== 'Manager') return;
+    if (window.confirm("Are you sure you want to delete this task? Associated time entries will lose their task reference.")) {
+      DB.deleteTask(taskId);
+      refreshData();
+    }
+  };
+
+  const handleTaskStatusChange = (taskId: string, newStatus: TaskStatus) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+        DB.addTask({ ...task, status: newStatus });
+        refreshData();
+    }
+  };
+
+  // --- USER MANAGEMENT HANDLERS ---
   const handleAddUser = (userData: Omit<User, 'id'>) => {
     if (currentUser?.role !== 'Manager') return;
     const newUser: User = {
@@ -451,7 +560,7 @@ function App() {
         newDate.setDate(newDate.getDate() + 7);
     } else if (dateFilterMode === 'MONTH') {
         newDate.setMonth(newDate.getMonth() + 1);
-        newDate.setDate(1); // Ensure we start at 1st to avoid skipping short months
+        newDate.setDate(1);
     }
     setCurrentDate(newDate);
   };
@@ -467,10 +576,8 @@ function App() {
     setCurrentDate(newDate);
   };
 
-  // Toggle Sidebar Handlers
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleDesktopSidebar = () => setIsDesktopCollapsed(!isDesktopCollapsed);
-
   const isFilterActive = debouncedSearchQuery !== '' || filterUserId !== 'ALL' || filterCategory !== 'ALL' || filterTaskName !== 'ALL';
 
   if (!isDbReady) {
@@ -536,7 +643,16 @@ function App() {
           </button>
           
           {currentUser.role === 'Manager' && (
-            <div className="pt-2">
+            <div className="pt-2 border-t border-slate-100 mt-2">
+              <p className={`px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 ${isDesktopCollapsed ? 'hidden' : 'block'}`}>Manage</p>
+              <button 
+                className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-colors ${view === 'TASKS' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
+                onClick={() => { setView('TASKS'); setIsMobileMenuOpen(false); }}
+                title="Tasks"
+              >
+                <CheckSquare className="w-5 h-5 flex-shrink-0" />
+                {(!isDesktopCollapsed || isMobileMenuOpen) && <span>Tasks</span>}
+              </button>
               <button 
                 className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition-colors ${view === 'USERS' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
                 onClick={() => { setView('USERS'); setIsMobileMenuOpen(false); }}
@@ -549,15 +665,34 @@ function App() {
           )}
         </nav>
         
-        {(!isDesktopCollapsed || isMobileMenuOpen) && currentUser.role === 'Manager' && view === 'DASHBOARD' && (
+        {(!isDesktopCollapsed || isMobileMenuOpen) && currentUser.role === 'Manager' && (
           <div className="p-4 m-4 bg-indigo-900 rounded-xl text-white shrink-0">
             <p className="text-xs font-medium text-indigo-200 uppercase mb-2">Dev Tools</p>
-            <button 
-              onClick={() => { handleGenerateData(); setIsMobileMenuOpen(false); }}
-              className="w-full bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-colors"
-            >
-              Generate Mock Data
-            </button>
+            <div className="space-y-2">
+                <button 
+                  onClick={() => { handleGenerateData(); setIsMobileMenuOpen(false); }}
+                  className="w-full bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Database className="w-3 h-3" /> Gen Data
+                </button>
+                <div className="flex gap-2">
+                   <button 
+                    onClick={handleExportDB}
+                    className="flex-1 bg-indigo-800 text-indigo-100 text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
+                    title="Export SQL"
+                  >
+                    <Download className="w-3 h-3" /> Export
+                  </button>
+                  <button 
+                    onClick={handleImportClick}
+                    className="flex-1 bg-indigo-800 text-indigo-100 text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
+                    title="Import SQL"
+                  >
+                    <Upload className="w-3 h-3" /> Import
+                  </button>
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".sql" />
+                </div>
+            </div>
           </div>
         )}
       </aside>
@@ -576,6 +711,11 @@ function App() {
               {view === 'USERS' && (
                  <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 truncate">
                    User Management
+                 </h2>
+              )}
+              {view === 'TASKS' && (
+                 <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 truncate">
+                   Task Management
                  </h2>
               )}
             </div>
@@ -640,7 +780,7 @@ function App() {
              <div className="flex items-center justify-end gap-2 md:gap-4 border-t md:border-t-0 border-slate-100 pt-2 md:pt-0">
                 {currentUser.role === 'Manager' && view === 'DASHBOARD' && (
                   <button 
-                      onClick={() => setProjectModalOpen(true)}
+                      onClick={() => { setEditingTask(null); setProjectModalOpen(true); }}
                       className="flex items-center space-x-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors shadow-sm active:scale-95"
                     >
                       <FilePlus2 className="w-4 h-4" />
@@ -649,6 +789,25 @@ function App() {
                 )}
                 
                 <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                {currentUser.role === 'Manager' && (
+                  <div className="relative">
+                    <button 
+                      onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors relative"
+                    >
+                      <Bell className="w-5 h-5" />
+                      {notifications.length > 0 && (
+                        <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                      )}
+                    </button>
+                    <NotificationDropdown 
+                      isOpen={isNotificationOpen} 
+                      onClose={() => setIsNotificationOpen(false)}
+                      notifications={notifications}
+                    />
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 pl-1">
                     <div className="text-right hidden lg:block">
@@ -681,6 +840,14 @@ function App() {
               onEditUser={handleEditUser}
               onDeleteUser={handleDeleteUser}
             />
+          ) : view === 'TASKS' ? (
+             <TaskManagement 
+                tasks={tasks}
+                onAddTask={() => { setEditingTask(null); setProjectModalOpen(true); }}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
+                onStatusChange={handleTaskStatusChange}
+             />
           ) : (
             // DASHBOARD VIEW
             <div className="space-y-6">
@@ -836,8 +1003,9 @@ function App() {
 
       <AddProjectModal 
         isOpen={isProjectModalOpen} 
-        onClose={() => setProjectModalOpen(false)} 
-        onSave={handleAddProject}
+        onClose={() => { setProjectModalOpen(false); setEditingTask(null); }} 
+        onSave={handleSaveTask}
+        taskToEdit={editingTask}
       />
 
     </div>

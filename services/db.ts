@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v6'; // Version bumped for Status change (New, InProgress, Done)
+const DB_KEY = 'chrono_guard_sqlite_db_v7'; // Version bumped for Schema Change (Status moved to Task)
 
 // --- Seed Data Generators ---
 
@@ -22,7 +22,7 @@ const SEED_USERS: User[] = [
 ];
 
 const SEED_TASKS: TaskDefinition[] = [
-  { id: 'PMI-EPIC 9', name: 'Task 25349: Implement Migration WCF HttpExternalHost project to WebAPI .NET8', estimatedHours: 36.5 },
+  { id: 'PMI-EPIC 9', name: 'Task 25349: Implement Migration WCF HttpExternalHost project to WebAPI .NET8', estimatedHours: 36.5, status: 'ToDo' },
 ];
 
 const generateSeedEntries = (): TimesheetEntry[] => {
@@ -42,7 +42,7 @@ const generateSeedEntries = (): TimesheetEntry[] => {
     return getTimesheets();
   }
   return [
-    { id: '1', userId: 'u1', userName: 'Thanh Vu', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Done' },
+    { id: '1', userId: 'u1', userName: 'Thanh Vu', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks'},
   ];
 };
 
@@ -98,7 +98,8 @@ export const initDB = async (): Promise<void> => {
         id TEXT PRIMARY KEY,
         name TEXT,
         estimatedHours REAL,
-        dueDate TEXT
+        dueDate TEXT,
+        status TEXT
       );
     `);
     db.run(`
@@ -113,7 +114,6 @@ export const initDB = async (): Promise<void> => {
         taskName TEXT,
         taskCategory TEXT,
         description TEXT,
-        status TEXT,
         managerComment TEXT
       );
     `);
@@ -165,12 +165,18 @@ export const getTasks = (): TaskDefinition[] => {
     id: row[0],
     name: row[1],
     estimatedHours: row[2],
-    dueDate: row[3]
+    dueDate: row[3],
+    status: row[4]
   }));
 };
 
 export const addTask = (task: TaskDefinition) => {
-  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?, ?)", [task.id, task.name, task.estimatedHours || null, task.dueDate || null]);
+  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?, ?, ?)", [task.id, task.name, task.estimatedHours || null, task.dueDate || null, task.status || 'ToDo']);
+  saveToStorage();
+};
+
+export const deleteTask = (id: string) => {
+  db.run("DELETE FROM tasks WHERE id = ?", [id]);
   saveToStorage();
 };
 
@@ -190,13 +196,12 @@ export const getTimesheets = (): TimesheetEntry[] => {
     taskName: row[7],
     taskCategory: row[8],
     description: row[9],
-    status: row[10],
-    managerComment: row[11] || ''
+    managerComment: row[10] || ''
   }));
 };
 
 export const addTimesheetEntry = (entry: TimesheetEntry) => {
-  db.run(`INSERT OR REPLACE INTO timesheets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+  db.run(`INSERT OR REPLACE INTO timesheets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     entry.id,
     entry.userId,
     entry.userName,
@@ -207,7 +212,6 @@ export const addTimesheetEntry = (entry: TimesheetEntry) => {
     entry.taskName,
     entry.taskCategory,
     entry.description,
-    entry.status,
     entry.managerComment || ''
   ]);
   saveToStorage();
@@ -220,4 +224,67 @@ export const updateTimesheetEntry = (entry: TimesheetEntry) => {
 export const deleteTimesheetEntry = (id: string) => {
   db.run("DELETE FROM timesheets WHERE id = ?", [id]);
   saveToStorage();
+};
+
+// --- Import / Export ---
+
+export const exportDatabaseSQL = (): string => {
+  if (!db) return '';
+  let sqlScript = "-- ChronoGuard DB Export\n-- Date: " + new Date().toISOString() + "\n\n";
+  const tables = ['users', 'tasks', 'timesheets'];
+
+  // 1. Get Schema
+  const schemaRes = db.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+  if (schemaRes.length > 0) {
+    schemaRes[0].values.forEach((row: any) => {
+      sqlScript += row[0] + ";\n\n";
+    });
+  }
+
+  // 2. Get Data
+  tables.forEach(table => {
+    try {
+      const res = db.exec(`SELECT * FROM ${table}`);
+      if (res.length > 0) {
+        const columns = res[0].columns;
+        const values = res[0].values;
+
+        sqlScript += `-- Data for ${table}\n`;
+        values.forEach((row: any[]) => {
+          const valueStr = row.map(v => {
+            if (v === null) return 'NULL';
+            if (typeof v === 'string') return `'${v.replace(/'/g, "''")}'`; // Escape single quotes
+            return v;
+          }).join(", ");
+          sqlScript += `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${valueStr});\n`;
+        });
+        sqlScript += "\n";
+      }
+    } catch (e) {
+      console.warn(`Could not export data for table ${table}`, e);
+    }
+  });
+
+  return sqlScript;
+};
+
+export const importDatabaseSQL = (sqlScript: string) => {
+  if (!db) return;
+  const tables = ['users', 'tasks', 'timesheets'];
+  
+  try {
+    // 1. Clear existing data
+    tables.forEach(t => db.run(`DROP TABLE IF EXISTS ${t}`));
+
+    // 2. Run Script
+    // sql.js exec runs multiple statements
+    db.exec(sqlScript);
+    
+    // 3. Save
+    saveToStorage();
+    return true;
+  } catch (error) {
+    console.error("Import Failed:", error);
+    throw error;
+  }
 };

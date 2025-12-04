@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { TimesheetEntry, TaskDefinition } from '../types';
-import { Clock, CheckCircle2, Circle, Pencil, User as UserIcon, MessageSquare, Trash2, AlertTriangle, CalendarX, ChevronLeft, ChevronRight, Loader2, PlusCircle, Hourglass } from 'lucide-react';
+import { Clock, Pencil, User as UserIcon, MessageSquare, Trash2, AlertTriangle, CalendarX, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
@@ -33,7 +33,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
   
   // Calculate colSpan dynamically based on visible columns
   const getColSpan = () => {
-    let cols = 4; // Date, Hours, Project, Status
+    let cols = 3; // Date, Hours, Project
     if (showUserColumn) cols += 1;
     if (onEdit || onDelete) cols += 1;
     return cols;
@@ -96,33 +96,6 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
       if (currentPage > 1) setCurrentPage(p => p - 1);
   };
 
-  const renderStatusBadge = (status: 'New' | 'InProgress' | 'Done') => {
-      switch (status) {
-          case 'Done':
-              return (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Done
-                  </span>
-              );
-          case 'InProgress':
-              return (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      In Progress
-                  </span>
-              );
-          case 'New':
-          default:
-              return (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      New
-                  </span>
-              );
-      }
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
       <div className="overflow-x-auto">
@@ -141,7 +114,6 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                 </th>
               )}
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Project / Task</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[140px]">Status</th>
               {(onEdit || onDelete) && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[110px]">Action</th>}
             </tr>
           </thead>
@@ -168,16 +140,16 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                 return (
                   <tr 
                     key={entry.id} 
-                    className={`transition-colors group ${isOvertime ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-slate-50'}`}
+                    className={`transition-colors group border-l-4 ${isOvertime ? 'bg-red-50 hover:bg-red-100/50 border-red-400' : 'hover:bg-slate-50 border-transparent'}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-slate-100 rounded-md">
-                          <Clock className="w-4 h-4 text-slate-500" />
+                        <div className={`p-2 rounded-md ${isOvertime ? 'bg-red-100' : 'bg-slate-100'}`}>
+                          <Clock className={`w-4 h-4 ${isOvertime ? 'text-red-500' : 'text-slate-500'}`} />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-slate-800">{entry.date}</p>
-                          <p className="text-xs text-slate-500">{entry.startTime} - {entry.endTime}</p>
+                          <p className={`text-sm font-medium ${isOvertime ? 'text-red-900' : 'text-slate-800'}`}>{entry.date}</p>
+                          <p className={`text-xs ${isOvertime ? 'text-red-700' : 'text-slate-500'}`}>{entry.startTime} - {entry.endTime}</p>
                         </div>
                       </div>
                     </td>
@@ -245,9 +217,6 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                       {renderStatusBadge(entry.status)}
                     </td>
                     {(onEdit || onDelete) && (
                       <td className="px-6 py-4 whitespace-nowrap text-center">
