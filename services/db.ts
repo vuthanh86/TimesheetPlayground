@@ -1,5 +1,6 @@
 
 import { TimesheetEntry, TaskDefinition, User } from '../types';
+import backupSql from '../database/backup.sql?raw';
 
 declare global {
   interface Window {
@@ -8,7 +9,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v7'; // Version bumped for Schema Change (Status moved to Task)
+const DB_KEY = 'chrono_guard_sqlite_db_v8'; // Version bumped for Schema Change (Status moved to Task)
 
 // --- Seed Data Generators ---
 
@@ -83,40 +84,42 @@ export const initDB = async (): Promise<void> => {
     db = new SQL.Database(binary);
   } else {
     db = new SQL.Database();
+    // load script from database/backup.sql
+    db.exec(backupSql);
     // Create Tables
-    db.run(`
-      CREATE TABLE users (
-        id TEXT PRIMARY KEY,
-        username TEXT,
-        name TEXT,
-        role TEXT,
-        avatar TEXT
-      );
-    `);
-    db.run(`
-      CREATE TABLE tasks (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        estimatedHours REAL,
-        dueDate TEXT,
-        status TEXT
-      );
-    `);
-    db.run(`
-      CREATE TABLE timesheets (
-        id TEXT PRIMARY KEY,
-        userId TEXT,
-        userName TEXT,
-        date TEXT,
-        startTime TEXT,
-        endTime TEXT,
-        durationHours REAL,
-        taskName TEXT,
-        taskCategory TEXT,
-        description TEXT,
-        managerComment TEXT
-      );
-    `);
+    // db.run(`
+    //   CREATE TABLE users (
+    //     id TEXT PRIMARY KEY,
+    //     username TEXT,
+    //     name TEXT,
+    //     role TEXT,
+    //     avatar TEXT
+    //   );
+    // `);
+    // db.run(`
+    //   CREATE TABLE tasks (
+    //     id TEXT PRIMARY KEY,
+    //     name TEXT,
+    //     estimatedHours REAL,
+    //     dueDate TEXT,
+    //     status TEXT
+    //   );
+    // `);
+    // db.run(`
+    //   CREATE TABLE timesheets (
+    //     id TEXT PRIMARY KEY,
+    //     userId TEXT,
+    //     userName TEXT,
+    //     date TEXT,
+    //     startTime TEXT,
+    //     endTime TEXT,
+    //     durationHours REAL,
+    //     taskName TEXT,
+    //     taskCategory TEXT,
+    //     description TEXT,
+    //     managerComment TEXT
+    //   );
+    // `);
     
     // Seed Data
     SEED_USERS.forEach(u => addUser(u));
@@ -279,7 +282,7 @@ export const importDatabaseSQL = (sqlScript: string) => {
     // 2. Run Script
     // sql.js exec runs multiple statements
     db.exec(sqlScript);
-    
+    generateSeedEntries().forEach(e => addTimesheetEntry(e));
     // 3. Save
     saveToStorage();
     return true;
