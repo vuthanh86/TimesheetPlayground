@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TimesheetEntry, TaskDefinition } from '../types';
-import { AlertTriangle, Lock, Clock, FileText, User as UserIcon, AlertCircle, CalendarX, CalendarCheck } from 'lucide-react';
+import { TimesheetEntry, TaskDefinition, TaskStatus } from '../types';
+import { AlertTriangle, Lock, Clock, FileText, User as UserIcon, AlertCircle, CalendarX, CalendarCheck, Users, CheckCircle2, Circle, Loader2 } from 'lucide-react';
 
 interface GanttChartProps {
   entries: TimesheetEntry[];
@@ -21,9 +21,18 @@ interface TaskGroup {
   entries: TimesheetEntry[];
   dueDate?: string;
   isOverdue?: boolean;
+  status?: TaskStatus;
 }
 
 // --- SUB-COMPONENTS FOR MEMOIZATION ---
+
+interface TooltipInfo {
+  x: number;
+  y: number;
+  entry: TimesheetEntry;
+  isOvertime?: boolean;
+  dayUsers?: string[];
+}
 
 interface GanttRowProps {
     task: TaskGroup;
@@ -33,7 +42,7 @@ interface GanttRowProps {
     onTaskClick?: (taskName: string) => void;
     onEntryClick?: (entry: TimesheetEntry) => void;
     onCellClick?: (date: Date, taskName?: string) => void;
-    onHover: (info: any) => void;
+    onHover: (info: TooltipInfo | null) => void;
     taskDefinitions: TaskDefinition[];
     allEntries: TimesheetEntry[];
 }
@@ -54,6 +63,30 @@ const isToday = (d: Date) => {
     return d.getDate() === today.getDate() && 
            d.getMonth() === today.getMonth() && 
            d.getFullYear() === today.getFullYear();
+};
+
+const renderTaskStatusBadge = (status?: TaskStatus) => {
+    switch (status) {
+        case 'Done':
+            return (
+                <div title="Task Status: Done" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Done
+                </div>
+            );
+        case 'InProgress':
+            return (
+                <div title="Task Status: In Progress" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> In Progress
+                </div>
+            );
+        case 'ToDo':
+        default:
+            return (
+                <div title="Task Status: To Do" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                    <Circle className="w-2.5 h-2.5" /> To Do
+                </div>
+            );
+    }
 };
 
 const GanttTaskRow = React.memo(({ 
@@ -112,15 +145,17 @@ const GanttTaskRow = React.memo(({
             </div>
             </div>
             
-            <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center justify-between mt-1.5">
                 <div className="flex items-center gap-1.5 truncate">
-                <span className="text-[10px] text-slate-400 truncate">{task.category}</span>
-                {task.dueDate && (
-                    <span className={`text-[9px] px-1 rounded flex items-center gap-0.5 ${task.isOverdue ? 'bg-red-50 text-red-600 font-bold' : 'bg-slate-100 text-slate-500'}`}>
-                        {task.isOverdue ? <CalendarX className="w-2 h-2" /> : <CalendarCheck className="w-2 h-2" />}
-                        {new Date(task.dueDate).toLocaleDateString('en-GB', {day: 'numeric', month: 'numeric'})}
-                    </span>
-                )}
+                    {/* Render Task Status Badge */}
+                    {renderTaskStatusBadge(task.status)}
+                    
+                    {task.dueDate && (
+                        <span className={`text-[9px] px-1 rounded flex items-center gap-0.5 ${task.isOverdue ? 'bg-red-50 text-red-600 font-bold' : 'bg-slate-100 text-slate-500'}`}>
+                            {task.isOverdue ? <CalendarX className="w-2 h-2" /> : <CalendarCheck className="w-2 h-2" />}
+                            {new Date(task.dueDate).toLocaleDateString('en-GB', {day: 'numeric', month: 'numeric'})}
+                        </span>
+                    )}
                 </div>
                 {limitInfo && (
                 <span 
@@ -152,6 +187,8 @@ const GanttTaskRow = React.memo(({
         {/* Day Columns */}
         {days.map((day, i) => {
             const dayEntries = getEntriesForDay(task.entries, day);
+            const dayUserNames = Array.from(new Set(dayEntries.map(e => e.userName)));
+
             return (
             <div 
                 key={i} 
@@ -175,7 +212,8 @@ const GanttTaskRow = React.memo(({
                             x: rect.left + (rect.width / 2),
                             y: rect.top,
                             entry,
-                            isOvertime
+                            isOvertime,
+                            dayUsers: dayUserNames
                         });
                     }}
                     onMouseLeave={() => onHover(null)}
@@ -216,7 +254,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
   onCellClick,
   onUserClick
 }) => {
-  const [hoveredTooltip, setHoveredTooltip] = useState<{x: number, y: number, entry: TimesheetEntry, isOvertime?: boolean} | null>(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState<TooltipInfo | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   // Responsive check
@@ -254,7 +292,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
             category: entry.taskCategory,
             entries: [],
             dueDate: taskDef?.dueDate,
-            isOverdue
+            isOverdue,
+            status: taskDef?.status
           };
         }
         acc[entry.taskName].entries.push(entry);
@@ -440,17 +479,27 @@ const GanttChart: React.FC<GanttChartProps> = ({
                <UserIcon className="w-3 h-3" />
                <span className="font-medium">{hoveredTooltip.entry.userName}</span>
             </div>
+            {/* Show other users who worked on this task today */}
+            {hoveredTooltip.dayUsers && hoveredTooltip.dayUsers.length > 1 && (
+               <div className="flex flex-wrap gap-1 mt-0.5 pl-5 border-l border-slate-700/50">
+                  {hoveredTooltip.dayUsers.filter(u => u !== hoveredTooltip.entry.userName).map(u => (
+                     <span key={u} className="flex items-center gap-1 text-[9px] bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-400">
+                        <Users className="w-2 h-2" /> {u}
+                     </span>
+                  ))}
+               </div>
+            )}
+
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
               <span>
                 {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({hoveredTooltip.entry.durationHours}h)
               </span>
             </div>
-            {/* Show Limit Context in Tooltip - We need to pass logic down or calc here, keeping simple for tooltip */}
+            {/* Show Limit Context in Tooltip */}
             {(() => {
                 const def = taskDefinitions.find(t => t.name === hoveredTooltip.entry.taskName);
                 if (def && def.estimatedHours) {
-                    // Quick recalc for tooltip only
                     const total = allEntries
                     .filter(e => e.taskName === hoveredTooltip.entry.taskName)
                     .reduce((sum, e) => sum + e.durationHours, 0);
@@ -470,7 +519,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
               </div>
             )}
             <div className="text-[10px] uppercase tracking-wide opacity-60 pt-1">
-               {hoveredTooltip.entry.taskCategory} • {hoveredTooltip.entry.status}
+               {hoveredTooltip.entry.taskCategory}
             </div>
           </div>
           {/* Arrow */}

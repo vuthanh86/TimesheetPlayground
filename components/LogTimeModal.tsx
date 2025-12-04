@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Clock, Calendar, Tag, FileText, Edit2, MessageSquare, Lock, Activity } from 'lucide-react';
+import { X, Clock, Calendar, Tag, FileText, Edit2, MessageSquare, Lock } from 'lucide-react';
 import { TimesheetEntry, TaskDefinition, User } from '../types';
 
 interface LogTimeModalProps {
@@ -47,7 +47,6 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
   const [category, setCategory] = useState('Development');
   const [description, setDescription] = useState('');
   const [managerComment, setManagerComment] = useState('');
-  const [status, setStatus] = useState<'New' | 'InProgress' | 'Done'>('New');
 
   // Determine if this is a Manager viewing someone else's entry
   const isReadOnly = entryToEdit && currentUser?.role === 'Manager' && entryToEdit.userId !== currentUser.id;
@@ -64,7 +63,6 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
         setCategory(entryToEdit.taskCategory);
         setDescription(entryToEdit.description);
         setManagerComment(entryToEdit.managerComment || '');
-        setStatus(entryToEdit.status);
       } else {
         // Create Mode: Reset to defaults
         setDate(initialDate || new Date().toISOString().split('T')[0]);
@@ -73,7 +71,6 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
         setDescription('');
         setManagerComment('');
         setCategory('Development');
-        setStatus('New');
         
         // Default to provided initialTaskName or first option
         if (initialTaskName) {
@@ -129,8 +126,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
       taskName,
       taskCategory: category,
       description,
-      managerComment,
-      status
+      managerComment
     });
   };
 
@@ -243,7 +239,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Task Category</label>
@@ -261,24 +257,6 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                     <option value="Research">Research</option>
                     <option value="Testing">Testing</option>
                     <option value="Documentation">Documentation</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Status</label>
-                <div className="relative group">
-                  <Activity className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                  <select 
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as 'New' | 'InProgress' | 'Done')}
-                    disabled={isReadOnly}
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option value="New">New</option>
-                    <option value="InProgress">In Progress</option>
-                    <option value="Done">Done</option>
                   </select>
                 </div>
               </div>

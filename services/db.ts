@@ -8,7 +8,7 @@ declare global {
 }
 
 let db: any = null;
-const DB_KEY = 'chrono_guard_sqlite_db_v6'; // Version bumped for Status change (New, InProgress, Done)
+const DB_KEY = 'chrono_guard_sqlite_db_v7'; // Version bumped for Schema Change (Status moved to Task)
 
 // --- Seed Data Generators ---
 
@@ -23,14 +23,14 @@ const SEED_USERS: User[] = [
 ];
 
 const SEED_TASKS: TaskDefinition[] = [
-  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', estimatedHours: 40, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 5))) }, // Due in 5 days
-  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', estimatedHours: 20, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() - 2))) }, // Overdue by 2 days
-  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', estimatedHours: 15 },
-  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', estimatedHours: 10, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 10))) },
-  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', estimatedHours: 25 },
-  { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring' },
-  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', estimatedHours: 5, dueDate: getLocalDateStr(new Date()) }, // Due Today
-  { id: 'INT-001', name: 'INT-001: Weekly Team Sync' }, // No limit
+  { id: 'PROJ-101', name: 'PROJ-101: Authentication System', estimatedHours: 40, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 5))), status: 'InProgress' }, // Due in 5 days
+  { id: 'PROJ-102', name: 'PROJ-102: Dashboard Analytics', estimatedHours: 20, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() - 2))), status: 'InProgress' }, // Overdue by 2 days
+  { id: 'PROJ-103', name: 'PROJ-103: User Profile Settings', estimatedHours: 15, status: 'Done' },
+  { id: 'PROJ-104', name: 'PROJ-104: API Rate Limiting', estimatedHours: 10, dueDate: getLocalDateStr(new Date(new Date().setDate(new Date().getDate() + 10))), status: 'ToDo' },
+  { id: 'PROJ-105', name: 'PROJ-105: Mobile Responsive Layout', estimatedHours: 25, status: 'Done' },
+  { id: 'MAINT-001', name: 'MAINT-001: Legacy Code Refactoring', status: 'InProgress' },
+  { id: 'BUG-204', name: 'BUG-204: Fix Login Timeout', estimatedHours: 5, dueDate: getLocalDateStr(new Date()), status: 'ToDo' }, // Due Today
+  { id: 'INT-001', name: 'INT-001: Weekly Team Sync', status: 'InProgress' }, // No limit
 ];
 
 const generateSeedEntries = (): TimesheetEntry[] => {
@@ -48,15 +48,15 @@ const generateSeedEntries = (): TimesheetEntry[] => {
   };
 
   return [
-    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', status: 'Done', managerComment: 'Good work on the flow.' },
-    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service', status: 'Done' },
-    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup', status: 'Done' },
-    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard', status: 'InProgress' },
-    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration', status: 'InProgress' },
-    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API', status: 'New' },
+    { id: '1', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'PROJ-101: Authentication System', taskCategory: 'Development', description: 'Implemented login flow', managerComment: 'Good work on the flow.' },
+    { id: '2', userId: 'u1', userName: 'Alex Dev', date: getDateStr(0), startTime: '13:00', endTime: '17:00', durationHours: 4, taskName: 'PROJ-103: User Profile Settings', taskCategory: 'Development', description: 'Refactored user service' },
+    { id: '3', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '10:00', endTime: '11:00', durationHours: 1, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Daily standup' },
+    { id: '4', userId: 'u1', userName: 'Alex Dev', date: getDateStr(1), startTime: '11:00', endTime: '18:00', durationHours: 7, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Design', description: 'UI mockups for dashboard' },
+    { id: '5', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '09:00', endTime: '15:00', durationHours: 6, taskName: 'PROJ-102: Dashboard Analytics', taskCategory: 'Development', description: 'API integration' },
+    { id: '6', userId: 'u1', userName: 'Alex Dev', date: getDateStr(2), startTime: '15:00', endTime: '17:00', durationHours: 2, taskName: 'PROJ-104: API Rate Limiting', taskCategory: 'Testing', description: 'Unit tests for API' },
     
-    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks', status: 'Done' },
-    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs', status: 'Done' },
+    { id: '7', userId: 'u2', userName: 'Jane Designer', date: getDateStr(0), startTime: '10:00', endTime: '16:00', durationHours: 6, taskName: 'PROJ-105: Mobile Responsive Layout', taskCategory: 'Design', description: 'High fidelity mobile mocks' },
+    { id: '8', userId: 'u2', userName: 'Jane Designer', date: getDateStr(1), startTime: '09:00', endTime: '12:00', durationHours: 3, taskName: 'INT-001: Weekly Team Sync', taskCategory: 'Meeting', description: 'Sync with Devs' },
   ];
 };
 
@@ -112,7 +112,8 @@ export const initDB = async (): Promise<void> => {
         id TEXT PRIMARY KEY,
         name TEXT,
         estimatedHours REAL,
-        dueDate TEXT
+        dueDate TEXT,
+        status TEXT
       );
     `);
     db.run(`
@@ -127,7 +128,6 @@ export const initDB = async (): Promise<void> => {
         taskName TEXT,
         taskCategory TEXT,
         description TEXT,
-        status TEXT,
         managerComment TEXT
       );
     `);
@@ -179,12 +179,18 @@ export const getTasks = (): TaskDefinition[] => {
     id: row[0],
     name: row[1],
     estimatedHours: row[2],
-    dueDate: row[3]
+    dueDate: row[3],
+    status: row[4]
   }));
 };
 
 export const addTask = (task: TaskDefinition) => {
-  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?, ?)", [task.id, task.name, task.estimatedHours || null, task.dueDate || null]);
+  db.run("INSERT OR REPLACE INTO tasks VALUES (?, ?, ?, ?, ?)", [task.id, task.name, task.estimatedHours || null, task.dueDate || null, task.status || 'ToDo']);
+  saveToStorage();
+};
+
+export const deleteTask = (id: string) => {
+  db.run("DELETE FROM tasks WHERE id = ?", [id]);
   saveToStorage();
 };
 
@@ -204,13 +210,12 @@ export const getTimesheets = (): TimesheetEntry[] => {
     taskName: row[7],
     taskCategory: row[8],
     description: row[9],
-    status: row[10],
-    managerComment: row[11] || ''
+    managerComment: row[10] || ''
   }));
 };
 
 export const addTimesheetEntry = (entry: TimesheetEntry) => {
-  db.run(`INSERT OR REPLACE INTO timesheets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+  db.run(`INSERT OR REPLACE INTO timesheets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     entry.id,
     entry.userId,
     entry.userName,
@@ -221,7 +226,6 @@ export const addTimesheetEntry = (entry: TimesheetEntry) => {
     entry.taskName,
     entry.taskCategory,
     entry.description,
-    entry.status,
     entry.managerComment || ''
   ]);
   saveToStorage();
@@ -234,4 +238,67 @@ export const updateTimesheetEntry = (entry: TimesheetEntry) => {
 export const deleteTimesheetEntry = (id: string) => {
   db.run("DELETE FROM timesheets WHERE id = ?", [id]);
   saveToStorage();
+};
+
+// --- Import / Export ---
+
+export const exportDatabaseSQL = (): string => {
+  if (!db) return '';
+  let sqlScript = "-- ChronoGuard DB Export\n-- Date: " + new Date().toISOString() + "\n\n";
+  const tables = ['users', 'tasks', 'timesheets'];
+
+  // 1. Get Schema
+  const schemaRes = db.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+  if (schemaRes.length > 0) {
+    schemaRes[0].values.forEach((row: any) => {
+      sqlScript += row[0] + ";\n\n";
+    });
+  }
+
+  // 2. Get Data
+  tables.forEach(table => {
+    try {
+      const res = db.exec(`SELECT * FROM ${table}`);
+      if (res.length > 0) {
+        const columns = res[0].columns;
+        const values = res[0].values;
+
+        sqlScript += `-- Data for ${table}\n`;
+        values.forEach((row: any[]) => {
+          const valueStr = row.map(v => {
+            if (v === null) return 'NULL';
+            if (typeof v === 'string') return `'${v.replace(/'/g, "''")}'`; // Escape single quotes
+            return v;
+          }).join(", ");
+          sqlScript += `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${valueStr});\n`;
+        });
+        sqlScript += "\n";
+      }
+    } catch (e) {
+      console.warn(`Could not export data for table ${table}`, e);
+    }
+  });
+
+  return sqlScript;
+};
+
+export const importDatabaseSQL = (sqlScript: string) => {
+  if (!db) return;
+  const tables = ['users', 'tasks', 'timesheets'];
+  
+  try {
+    // 1. Clear existing data
+    tables.forEach(t => db.run(`DROP TABLE IF EXISTS ${t}`));
+
+    // 2. Run Script
+    // sql.js exec runs multiple statements
+    db.exec(sqlScript);
+    
+    // 3. Save
+    saveToStorage();
+    return true;
+  } catch (error) {
+    console.error("Import Failed:", error);
+    throw error;
+  }
 };

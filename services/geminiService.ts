@@ -28,7 +28,6 @@ export const analyzeTimesheetData = async (entries: TimesheetEntry[]): Promise<A
         taskName: e.taskName,
         category: e.taskCategory, 
         desc: e.description,
-        status: e.status,
         managerComment: e.managerComment
       })))}
     `;
@@ -99,10 +98,9 @@ export const generateMockTimesheets = async (startDate: string, days: number): P
               durationHours: { type: Type.NUMBER },
               taskName: { type: Type.STRING, description: "Project ID and Name" },
               taskCategory: { type: Type.STRING },
-              description: { type: Type.STRING },
-              status: { type: Type.STRING, enum: ["Approved", "Pending"] }
+              description: { type: Type.STRING }
             },
-            required: ["date", "startTime", "endTime", "durationHours", "taskName", "taskCategory", "description", "status"]
+            required: ["date", "startTime", "endTime", "durationHours", "taskName", "taskCategory", "description"]
           }
         }
       }
