@@ -645,7 +645,10 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
+    <>
+      <Analytics />
+      <SpeedInsights />
+      <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
       
       {/* Mobile Backdrop */}
       {isMobileMenuOpen && (
@@ -1073,6 +1076,7 @@ function App() {
       />
 
     </div>
+    </>
   );
 }
 
