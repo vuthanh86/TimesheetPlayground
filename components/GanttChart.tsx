@@ -47,6 +47,17 @@ interface GanttRowProps {
     allEntries: TimesheetEntry[];
 }
 
+// Helper to format decimal hours to "1h 30m" format
+const formatDuration = (decimalHours: number) => {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  
+  if (h === 0 && m === 0) return '0h';
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+};
+
 const getCategoryColor = (category: string) => {
     switch (category) {
       case 'Development': return 'bg-blue-500 border-blue-600 text-blue-50';
@@ -106,8 +117,7 @@ const GanttTaskRow = React.memo(({
         const def = taskDefinitions.find(t => t.name === task.name);
         if (!def || !def.estimatedHours) return null;
         
-        // This is still slightly expensive if allEntries is massive, 
-        // but it's now localized to this memoized component
+        // Calculate total logged from all history to show accurate budget usage
         const totalLogged = allEntries
           .filter(e => e.taskName === task.name)
           .reduce((sum, e) => sum + e.durationHours, 0);
@@ -164,9 +174,9 @@ const GanttTaskRow = React.memo(({
                     limitInfo.percentage > 85 ? 'bg-orange-50 text-orange-600 border-orange-100' :
                     'bg-slate-100 text-slate-600 border-slate-200'
                     }`}
-                    title={`Budget Usage: ${limitInfo.current.toFixed(1)}h / ${limitInfo.limit.toFixed(1)}h`}
+                    title={`Budget Usage: ${formatDuration(limitInfo.current)} used of ${formatDuration(limitInfo.limit)}`}
                 >
-                    {limitInfo.current.toFixed(1)} / {limitInfo.limit.toFixed(1)}h
+                    {formatDuration(limitInfo.current)} / {formatDuration(limitInfo.limit)}
                 </span>
                 )}
             </div>
@@ -229,7 +239,7 @@ const GanttTaskRow = React.memo(({
                     style={{ width: `${widthPercent}%` }}
                     >
                     {isOvertime && <AlertTriangle className="w-3 h-3 text-white fill-white/20" />}
-                    {entry.durationHours}h
+                    {formatDuration(entry.durationHours)}
                     </div>
                 );
                 })}
@@ -325,7 +335,13 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const overtimeEntryIds = useMemo(() => {
     const overtimeIds = new Set<string>();
     
-    // Use allEntries to calculate full history context
+    // Create Task Map for fast lookup
+    const taskMap = taskDefinitions.reduce((acc, t) => {
+        acc[t.name] = t;
+        return acc;
+    }, {} as Record<string, TaskDefinition>);
+
+    // Group all entries (history) by Task Name
     const allTasksMap = allEntries.reduce((acc, entry) => {
       if (!acc[entry.taskName]) acc[entry.taskName] = [];
       acc[entry.taskName].push(entry);
@@ -333,13 +349,14 @@ const GanttChart: React.FC<GanttChartProps> = ({
     }, {} as Record<string, TimesheetEntry[]>);
 
     Object.keys(allTasksMap).forEach(taskName => {
-      const taskDef = taskDefinitions.find(t => t.name === taskName);
+      const taskDef = taskMap[taskName];
       if (!taskDef || !taskDef.estimatedHours) return;
 
       const limit = taskDef.estimatedHours;
+      // Robust Sort: Date String (YYYY-MM-DD) then Start Time (HH:mm)
+      // Allows calculating accumulation in strict chronological order
       const sortedEntries = allTasksMap[taskName].sort((a, b) => {
-        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-        if (dateDiff !== 0) return dateDiff;
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
         return a.startTime.localeCompare(b.startTime);
       });
 
@@ -348,9 +365,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
         const prevTotal = runningTotal;
         runningTotal += entry.durationHours;
         
-        if (prevTotal >= limit) {
-           overtimeIds.add(entry.id);
-        } else if (runningTotal > limit) {
+        // Flag if previous total was already over limit, OR if this entry pushes it over
+        if (prevTotal >= limit || runningTotal > limit) {
            overtimeIds.add(entry.id);
         }
       });
@@ -448,7 +464,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                  {dailyTotals.map((total, i) => (
                    <div key={i} className={`p-3 text-center border-l border-slate-100 ${isToday(days[i]) ? 'bg-amber-50' : 'bg-slate-50'}`}>
                      <span className={`text-sm font-bold block ${total > 8 ? 'text-indigo-600' : total > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
-                       {total > 0 ? total.toFixed(1) + 'h' : '-'}
+                       {total > 0 ? formatDuration(total) : '-'}
                      </span>
                    </div>
                  ))}
@@ -493,7 +509,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
               <span>
-                {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({hoveredTooltip.entry.durationHours}h)
+                {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({formatDuration(hoveredTooltip.entry.durationHours)})
               </span>
             </div>
             {/* Show Limit Context in Tooltip */}
@@ -506,7 +522,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                     return (
                         <div className="flex items-center gap-2 text-amber-300 border-t border-slate-700/50 pt-1 mt-1">
                         <AlertCircle className="w-3 h-3" />
-                        <span>Task Budget: {total.toFixed(1)}h / {def.estimatedHours.toFixed(1)}h</span>
+                        <span>Task Budget: {formatDuration(total)} / {formatDuration(def.estimatedHours)}</span>
                         </div>
                     );
                 }

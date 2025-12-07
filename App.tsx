@@ -25,7 +25,8 @@ import {
   CheckSquare,
   Bell,
   Download,
-  Upload
+  Upload,
+  FileText
 } from 'lucide-react';
 import { TimesheetEntry, TaskDefinition, User, TaskStatus } from './types';
 import StatsCard from './components/StatsCard';
@@ -309,7 +310,43 @@ function App() {
     }
   };
   
-  // --- EXPORT / IMPORT DB HANDLERS ---
+  // --- EXPORT / IMPORT HANDLERS ---
+  
+  const exportToCSV = (data: TimesheetEntry[], filename: string) => {
+    if (data.length === 0) {
+        alert("No data to export.");
+        return;
+    }
+    const headers = ['ID', 'Date', 'Start Time', 'End Time', 'Duration', 'Task', 'Category', 'User', 'Description', 'Manager Comment'];
+    const csvContent = [
+        headers.join(','),
+        ...data.map(e => {
+            const row = [
+                e.id,
+                e.date,
+                e.startTime,
+                e.endTime,
+                e.durationHours.toFixed(2),
+                `"${e.taskName.replace(/"/g, '""')}"`,
+                e.taskCategory,
+                `"${e.userName.replace(/"/g, '""')}"`,
+                `"${(e.description || '').replace(/"/g, '""')}"`,
+                `"${(e.managerComment || '').replace(/"/g, '""')}"`
+            ];
+            return row.join(',');
+        })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleExportDB = () => {
     const sql = DB.exportDatabaseSQL();
     const blob = new Blob([sql], { type: 'application/sql' });
@@ -667,8 +704,15 @@ function App() {
         
         {(!isDesktopCollapsed || isMobileMenuOpen) && currentUser.role === 'Manager' && (
           <div className="p-4 m-4 bg-indigo-900 rounded-xl text-white shrink-0">
-            <p className="text-xs font-medium text-indigo-200 uppercase mb-2">Dev Tools</p>
+            <p className="text-xs font-medium text-indigo-200 uppercase mb-2">Data Tools</p>
             <div className="space-y-2">
+                <button 
+                  onClick={() => exportToCSV(entries, `full_timesheet_export_${new Date().toISOString().slice(0,10)}.csv`)}
+                  className="w-full bg-indigo-800 text-indigo-100 text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  title="Export All CSV"
+                >
+                  <FileText className="w-3 h-3" /> Export CSV
+                </button>
                 <button 
                   onClick={() => { handleGenerateData(); setIsMobileMenuOpen(false); }}
                   className="w-full bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
@@ -681,14 +725,14 @@ function App() {
                     className="flex-1 bg-indigo-800 text-indigo-100 text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
                     title="Export SQL"
                   >
-                    <Download className="w-3 h-3" /> Export
+                    <Download className="w-3 h-3" /> SQL Exp
                   </button>
                   <button 
                     onClick={handleImportClick}
                     className="flex-1 bg-indigo-800 text-indigo-100 text-xs font-bold py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
                     title="Import SQL"
                   >
-                    <Upload className="w-3 h-3" /> Import
+                    <Upload className="w-3 h-3" /> SQL Imp
                   </button>
                   <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".sql" />
                 </div>
@@ -973,6 +1017,13 @@ function App() {
                        <Clock className="w-5 h-5 text-slate-400" />
                        Activity Log
                     </h2>
+                    <button 
+                       onClick={() => exportToCSV(filteredEntries, `timesheet_view_export_${new Date().toISOString().slice(0,10)}.csv`)}
+                       className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                       title="Export filtered view to CSV"
+                    >
+                       <FileText className="w-4 h-4" /> Export CSV
+                    </button>
                   </div>
                   <TimesheetTable 
                     entries={filteredEntries} 

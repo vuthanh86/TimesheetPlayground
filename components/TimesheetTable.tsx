@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import { TimesheetEntry, TaskDefinition } from '../types';
-import { Clock, Pencil, User as UserIcon, MessageSquare, Trash2, AlertTriangle, CalendarX, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TimesheetEntry, TaskDefinition, TaskStatus } from '../types';
+import { Clock, Pencil, User as UserIcon, MessageSquare, Trash2, AlertTriangle, CalendarX, ChevronLeft, ChevronRight, CheckCircle2, Circle, Loader2 } from 'lucide-react';
 
 interface TimesheetTableProps {
   entries: TimesheetEntry[];
@@ -14,6 +14,18 @@ interface TimesheetTableProps {
 }
 
 const ITEMS_PER_PAGE = 10;
+
+const renderStatusBadge = (taskStatus?: TaskStatus) => {
+    switch (taskStatus) {
+        case 'Done':
+            return <div title="Task Done" className="inline-flex"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>;
+        case 'InProgress':
+            return <div title="In Progress" className="inline-flex"><Loader2 className="w-4 h-4 text-amber-500 animate-spin" /></div>;
+        case 'ToDo':
+        default:
+            return <div title="To Do" className="inline-flex"><Circle className="w-4 h-4 text-slate-400" /></div>;
+    }
+};
 
 const TimesheetTable: React.FC<TimesheetTableProps> = ({ 
   entries, 
@@ -61,10 +73,9 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
         const taskDef = taskMap[taskName];
         if (!taskDef || !taskDef.estimatedHours) return;
 
-        // Sort chronologically
+        // Sort chronologically (Robust String Sort: Date then Time)
         const sorted = entriesByTask[taskName].sort((a, b) => {
-            const dDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-            if (dDiff !== 0) return dDiff;
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.startTime.localeCompare(b.startTime);
         });
 
@@ -175,6 +186,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
+                          {renderStatusBadge(taskDef?.status)}
                           {isOvertime && (
                             <div title="Overtime: This entry exceeds the task's estimated limit." className="text-red-500 cursor-help">
                                 <AlertTriangle className="w-4 h-4" />
