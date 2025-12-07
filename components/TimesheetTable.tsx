@@ -22,7 +22,7 @@ const formatDuration = (decimalHours: number) => {
   
   if (h === 0 && m === 0) return '0h';
   if (m === 0) return `${h}h`;
-  if (h === 0) return `${m}m`;
+  if (m === 0) return `${m}m`;
   return `${h}h ${m}m`;
 };
 
@@ -56,7 +56,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
   
   // Calculate colSpan dynamically based on visible columns
   const getColSpan = () => {
-    let cols = 3; // Date, Hours, Project
+    let cols = 4; // Date, Hours, Project, Description
     if (showUserColumn) cols += 1;
     if (onEdit || onDelete) cols += 1;
     return cols;
@@ -147,6 +147,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                 </th>
               )}
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Project / Task</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
               {(onEdit || onDelete) && <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center w-[110px]">Action</th>}
             </tr>
           </thead>
@@ -257,6 +258,11 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                           )}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 max-w-[280px]">
+                        <p className="text-sm text-slate-600 truncate" title={entry.description}>
+                            {entry.description || <span className="text-slate-400 italic">No description</span>}
+                        </p>
                     </td>
                     {(onEdit || onDelete) && (
                       <td className="px-6 py-4 whitespace-nowrap text-center">
