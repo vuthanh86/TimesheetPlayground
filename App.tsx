@@ -46,6 +46,17 @@ const getLocalDateStr = (d: Date) => {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 };
 
+// Helper to format decimal hours to "1h 30m" format
+const formatDuration = (decimalHours: number) => {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  
+  if (h === 0 && m === 0) return '0h';
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+};
+
 type DateFilterMode = 'WEEK' | 'MONTH' | 'RANGE';
 type ViewType = 'DASHBOARD' | 'USERS' | 'TASKS';
 
@@ -978,20 +989,20 @@ function App() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <StatsCard 
                     title={`Logged Today`} 
-                    value={`${kpiStats.daily.toFixed(1)}h`} 
+                    value={formatDuration(kpiStats.daily)} 
                     trend="vs yesterday" 
                     icon={Clock} 
                     color="bg-indigo-500" 
                   />
                   <StatsCard 
                     title="This Week" 
-                    value={`${kpiStats.weekly.toFixed(1)}h`} 
+                    value={formatDuration(kpiStats.weekly)} 
                     icon={CalendarDays} 
                     color="bg-emerald-500" 
                   />
                   <StatsCard 
                     title="This Month" 
-                    value={`${kpiStats.monthly.toFixed(1)}h`} 
+                    value={formatDuration(kpiStats.monthly)} 
                     icon={Briefcase} 
                     color="bg-amber-500" 
                   />
