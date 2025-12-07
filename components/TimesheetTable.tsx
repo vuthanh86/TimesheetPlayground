@@ -15,6 +15,17 @@ interface TimesheetTableProps {
 
 const ITEMS_PER_PAGE = 10;
 
+// Helper to format decimal hours to "1h 30m" format
+const formatDuration = (decimalHours: number) => {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  
+  if (h === 0 && m === 0) return '0h';
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+};
+
 const renderStatusBadge = (taskStatus?: TaskStatus) => {
     switch (taskStatus) {
         case 'Done':
@@ -51,10 +62,16 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
     return cols;
   };
 
-  // Compute set of entry IDs that are overtime (exceed task limit chronologically)
-  const overtimeEntryIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (!tasks || tasks.length === 0 || allEntries.length === 0) return ids;
+  // Compute detailed overtime info for each entry
+  // Returns a Map where key is entry.id and value is { cumulative, limit }
+  const entryOvertimeInfo = useMemo(() => {
+    const infoMap = new Map<string, { cumulative: number; limit: number }>();
+    
+    // Ensure we have data to work with. If allEntries is empty (e.g. initial load), fallback to entries if available,
+    // though allEntries is preferred for accurate cumulative sums.
+    const sourceEntries = allEntries.length > 0 ? allEntries : entries;
+    
+    if (!tasks || tasks.length === 0 || sourceEntries.length === 0) return infoMap;
 
     // Map tasks for quick lookup
     const taskMap = tasks.reduce((acc, t) => {
@@ -64,7 +81,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
 
     // Group entries by task
     const entriesByTask: Record<string, TimesheetEntry[]> = {};
-    allEntries.forEach(e => {
+    sourceEntries.forEach(e => {
         if (!entriesByTask[e.taskName]) entriesByTask[e.taskName] = [];
         entriesByTask[e.taskName].push(e);
     });
@@ -74,23 +91,28 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
         if (!taskDef || !taskDef.estimatedHours) return;
 
         // Sort chronologically (Robust String Sort: Date then Time)
+        // This ensures that we accumulate hours in the order they occurred.
         const sorted = entriesByTask[taskName].sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.startTime.localeCompare(b.startTime);
         });
 
-        let sum = 0;
+        let runningTotal = 0;
         sorted.forEach(e => {
-            const prev = sum;
-            sum += e.durationHours;
-            // If previous total was already over limit, or this entry pushes it over
-            if (prev >= taskDef.estimatedHours! || sum > taskDef.estimatedHours!) {
-                ids.add(e.id);
+            runningTotal += e.durationHours;
+            
+            // If the running total STRICTLY exceeds the limit, this entry contributes to overtime.
+            // Note: If previous entries already exceeded, this one definitely does too.
+            if (runningTotal > taskDef.estimatedHours!) {
+                infoMap.set(e.id, {
+                    cumulative: runningTotal,
+                    limit: taskDef.estimatedHours!
+                });
             }
         });
     });
-    return ids;
-  }, [allEntries, tasks]);
+    return infoMap;
+  }, [allEntries, entries, tasks]);
 
   // Pagination Logic
   const totalPages = Math.ceil(entries.length / ITEMS_PER_PAGE);
@@ -138,7 +160,10 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
             ) : (
               paginatedEntries.map((entry) => {
                 const taskDef = tasks?.find(t => t.name === entry.taskName);
-                const isOvertime = overtimeEntryIds.has(entry.id);
+                
+                const overtimeInfo = entryOvertimeInfo.get(entry.id);
+                const isOvertime = !!overtimeInfo;
+
                 let isOverdue = false;
                 if (taskDef?.dueDate) {
                     const due = new Date(taskDef.dueDate);
@@ -165,7 +190,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className={`text-sm font-bold ${isOvertime ? 'text-red-600' : 'text-slate-700'}`}>{entry.durationHours.toFixed(1)} h</span>
+                      <span className={`text-sm font-bold ${isOvertime ? 'text-red-600' : 'text-slate-700'}`}>{formatDuration(entry.durationHours)}</span>
                     </td>
                     {showUserColumn && (
                        <td className="px-6 py-4 whitespace-nowrap">
@@ -188,7 +213,10 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                         <div className="flex items-center gap-2">
                           {renderStatusBadge(taskDef?.status)}
                           {isOvertime && (
-                            <div title="Overtime: This entry exceeds the task's estimated limit." className="text-red-500 cursor-help">
+                            <div 
+                              title={`Overtime Warning!\n\nThis entry exceeds the task budget.\nCumulative Logged: ${formatDuration(overtimeInfo!.cumulative)}\nTask Budget: ${formatDuration(overtimeInfo!.limit)}`} 
+                              className="text-red-500 cursor-help"
+                            >
                                 <AlertTriangle className="w-4 h-4" />
                             </div>
                           )}
@@ -223,8 +251,8 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({
                             {entry.taskCategory}
                           </span>
                           {taskDef?.estimatedHours && (
-                            <span className="text-[10px] text-slate-400">
-                               Est: {taskDef.estimatedHours}h
+                            <span className={`text-[10px] ${isOvertime ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+                               Est: {formatDuration(taskDef.estimatedHours)}
                             </span>
                           )}
                         </div>
