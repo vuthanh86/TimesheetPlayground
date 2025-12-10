@@ -83,6 +83,7 @@ export const initDB = async (): Promise<void> => {
   }
 
   const SQL = await window.initSqlJs({
+    // Use CDN for the WASM file to ensure it loads without local file setup
     locateFile: (file: string) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
   });
 

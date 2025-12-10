@@ -54,7 +54,7 @@ const formatDuration = (decimalHours: number) => {
   
   if (h === 0 && m === 0) return '0h';
   if (m === 0) return `${h}h`;
-  if (h === 0) return `${m}m`;
+  if (m === 0) return `${m}m`;
   return `${h}h ${m}m`;
 };
 
@@ -137,7 +137,7 @@ const GanttTaskRow = React.memo(({
     return (
         <div className="hover:bg-slate-50/50 transition-colors group" style={gridStyle}>
         {/* Task Name Column - Sticky Left */}
-        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-20 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
+        <div className="p-3 flex flex-col justify-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-30 shadow-[4px_0_8px_rgba(0,0,0,0.03)] border-r border-slate-100">
             <div className="flex items-start justify-between gap-1">
             <div className="flex items-center gap-1.5 min-w-0">
                 {task.isOverdue && (
@@ -382,10 +382,11 @@ const GanttChart: React.FC<GanttChartProps> = ({
   }, [allEntries, entries, taskDefinitions]);
 
   // Dynamic Grid Style
-  const taskColWidth = isMobile ? '140px' : '250px';
+  const taskColWidth = isMobile ? '160px' : '260px'; // Slightly widened for better reading
+  // Increased min-width for day columns to trigger scroll on dense views (56px)
   const gridStyle = useMemo(() => ({
     display: 'grid',
-    gridTemplateColumns: `${taskColWidth} repeat(${daysToShow}, minmax(40px, 1fr))`
+    gridTemplateColumns: `${taskColWidth} repeat(${daysToShow}, minmax(56px, 1fr))`
   }), [taskColWidth, daysToShow]);
 
   return (
@@ -419,9 +420,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
           <div className="min-w-max relative">
               
               {/* Header Row - Sticky Top */}
-              <div className="bg-slate-50 border-b border-slate-200 sticky top-0 z-30 shadow-sm" style={gridStyle}>
+              <div className="bg-slate-50 border-b border-slate-200 sticky top-0 z-40 shadow-sm" style={gridStyle}>
                 {/* Frozen Corner Cell */}
-                <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky left-0 z-40 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                <div className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky left-0 z-50 border-r border-slate-100 shadow-[4px_0_8px_rgba(0,0,0,0.03)]">
                   Task
                 </div>
                 {/* Date Columns */}
@@ -461,9 +462,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
               </div>
 
               {/* Totals Row - Sticky Bottom */}
-              <div className="bg-slate-50 border-t border-slate-200 sticky bottom-0 z-30 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]" style={gridStyle}>
+              <div className="bg-slate-50 border-t border-slate-200 sticky bottom-0 z-40 shadow-[0_-2px_4px_rgba(0,0,0,0.05)]" style={gridStyle}>
                  {/* Frozen Footer Corner */}
-                 <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50 sticky left-0 z-40 shadow-[2px_0_5px_rgba(0,0,0,0.02)] border-r border-slate-100">
+                 <div className="p-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right pr-4 flex items-center justify-end bg-slate-50 sticky left-0 z-50 shadow-[4px_0_8px_rgba(0,0,0,0.03)] border-r border-slate-100">
                    Total Hours
                  </div>
                  {/* Total Cells */}

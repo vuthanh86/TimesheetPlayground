@@ -17,6 +17,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    if (!username.trim() || !password.trim()) {
+        setError('Please enter both username and password');
+        return;
+    }
+
     setIsLoading(true);
 
     // Simulate network delay
@@ -48,7 +54,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
         </div>
 
         <div className="p-6 md:p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Username</label>
               <div className="relative group">
@@ -56,10 +62,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
                 <input 
                   type="text" 
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => { setUsername(e.target.value); setError(''); }}
                   placeholder="e.g. admin or alex"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
-                  required
+                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-xl focus:bg-white focus:outline-none focus:ring-2 transition-all text-sm font-medium text-slate-700 ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'}`}
                 />
               </div>
             </div>
@@ -71,16 +76,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
                 <input 
                   type="password" 
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
-                  required
+                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-xl focus:bg-white focus:outline-none focus:ring-2 transition-all text-sm font-medium text-slate-700 ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'}`}
                 />
               </div>
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-sm">
+              <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-sm animate-in fade-in slide-in-from-top-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
                 {error}
               </div>
@@ -99,10 +103,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, users }) => {
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-center text-xs text-slate-400 mb-3">Demo Credentials (Password: 123)</p>
             <div className="flex justify-center gap-2 flex-wrap">
-               <button onClick={() => { setUsername('admin'); setPassword('123'); }} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 hover:bg-slate-200 transition-colors">
+               <button onClick={() => { setUsername('admin'); setPassword('123'); setError(''); }} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 hover:bg-slate-200 transition-colors">
                   Manager: admin
                </button>
-               <button onClick={() => { setUsername('alex'); setPassword('123'); }} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 hover:bg-slate-200 transition-colors">
+               <button onClick={() => { setUsername('alex'); setPassword('123'); setError(''); }} className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-600 hover:bg-slate-200 transition-colors">
                   Employee: alex
                </button>
             </div>

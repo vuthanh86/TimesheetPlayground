@@ -53,7 +53,7 @@ const formatDuration = (decimalHours: number) => {
   
   if (h === 0 && m === 0) return '0h';
   if (m === 0) return `${h}h`;
-  if (h === 0) return `${m}m`;
+  if (m === 0) return `${m}m`;
   return `${h}h ${m}m`;
 };
 
@@ -219,25 +219,34 @@ function App() {
   const kpiStats = useMemo(() => {
     const attributeFiltered = accessibleEntries.filter(matchesFilters);
 
-    const dateStr = getLocalDateStr(currentDate);
-    const { start: weekStart, end: weekEnd } = { 
+    // 1. Logged Today: Always use Real Today (Local Time), irrespective of the dashboard view date
+    const now = new Date();
+    const todayStr = getLocalDateStr(now);
+    const daily = attributeFiltered.filter(e => e.date === todayStr).reduce((acc, c) => acc + c.durationHours, 0);
+
+    // 2. Weekly/Monthly: Use the View Context (currentDate)
+    // This allows "This Week" to mean "The Week Currently Being Viewed"
+    const { start: viewStart, end: viewEnd } = { 
         start: new Date(currentDate), 
         end: new Date(currentDate) 
     };
-    const day = weekStart.getDay();
-    const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
-    weekStart.setDate(diff);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    weekStart.setHours(0,0,0,0); weekEnd.setHours(23,59,59,999);
+    
+    // Calculate week bounds for the currently viewed date
+    const day = viewStart.getDay();
+    const diff = viewStart.getDate() - day + (day === 0 ? -6 : 1);
+    viewStart.setDate(diff);
+    viewEnd.setDate(viewStart.getDate() + 6);
+    viewStart.setHours(0,0,0,0); 
+    viewEnd.setHours(23,59,59,999);
 
     const monthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const daily = attributeFiltered.filter(e => e.date === dateStr).reduce((acc, c) => acc + c.durationHours, 0);
     const weekly = attributeFiltered.filter(e => {
         const [y, m, d] = e.date.split('-').map(Number);
         const entryDate = new Date(y, m - 1, d, 12, 0, 0);
-        return entryDate >= weekStart && entryDate <= weekEnd;
+        return entryDate >= viewStart && entryDate <= viewEnd;
     }).reduce((acc, c) => acc + c.durationHours, 0);
+    
     const monthly = attributeFiltered.filter(e => e.date.startsWith(monthStr)).reduce((acc, c) => acc + c.durationHours, 0);
 
     return { daily, weekly, monthly };
@@ -457,19 +466,17 @@ function App() {
      };
   };
 
-  const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>) => {
-    if (!currentUser) return;
+  const handleSaveEntry = (entryData: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>): string | null => {
+    if (!currentUser) return "Session invalid. Please login again.";
     
     const targetUserId = editingEntry ? editingEntry.userId : currentUser.id;
 
     if (checkOverlap(targetUserId, entryData.date, entryData.startTime, entryData.endTime, editingEntry?.id)) {
-      alert("Error: Time entry overlaps with an existing entry.");
-      return;
+      return "Time entry overlaps with an existing entry.";
     }
 
     if (checkWeeklyLimit(targetUserId, entryData.date, entryData.durationHours, editingEntry?.id)) {
-      alert("Error: This entry exceeds the 40-hour weekly limit.");
-      return;
+      return "This entry exceeds the 40-hour weekly limit.";
     }
 
     const taskCheck = checkTaskLimit(entryData.taskName, entryData.durationHours, editingEntry?.id);
@@ -481,7 +488,7 @@ function App() {
          `New Entry: ${entryData.durationHours.toFixed(1)}h\n\n` +
          `Do you want to log this as Overtime?`
        );
-       if (!isConfirmed) return;
+       if (!isConfirmed) return "Action cancelled. Budget limit exceeded.";
     }
 
     if (editingEntry) {
@@ -499,6 +506,7 @@ function App() {
     }
     refreshData();
     setLogModalOpen(false);
+    return null;
   };
 
   const handleEditEntry = (entry: TimesheetEntry) => {

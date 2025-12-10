@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Clock, Calendar, Tag, FileText, Edit2, MessageSquare, Lock, Timer } from 'lucide-react';
+import { X, Clock, Calendar, Tag, FileText, Edit2, MessageSquare, Lock, Timer, AlertCircle } from 'lucide-react';
 import { TimesheetEntry, TaskDefinition, User } from '../types';
 
 interface LogTimeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>) => void;
+  onSave: (entry: Omit<TimesheetEntry, 'id' | 'userId' | 'userName'>) => string | null;
   initialDate?: string;
   initialTaskName?: string;
   availableTasks?: TimesheetEntry[]; // Kept for interface stability, but unused now
@@ -30,6 +30,12 @@ const generateTimeOptions = () => {
 
 const TIME_OPTIONS = generateTimeOptions();
 
+// Helper for local date string YYYY-MM-DD (Duplicated to avoid circular deps or prop drilling complexity)
+const getLocalTodayStr = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+
 const LogTimeModal: React.FC<LogTimeModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -40,13 +46,14 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
   entryToEdit,
   currentUser
 }) => {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(initialDate || getLocalTodayStr());
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [taskName, setTaskName] = useState('');
   const [category, setCategory] = useState('Development');
   const [description, setDescription] = useState('');
   const [managerComment, setManagerComment] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Determine if this is a Manager viewing someone else's entry
   const isReadOnly = entryToEdit && currentUser?.role === 'Manager' && entryToEdit.userId !== currentUser.id;
@@ -54,6 +61,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
   // Initialize state when modal opens
   useEffect(() => {
     if (isOpen) {
+      setErrors({});
       if (entryToEdit) {
         // Edit Mode: Populate fields from existing entry
         setDate(entryToEdit.date);
@@ -65,7 +73,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
         setManagerComment(entryToEdit.managerComment || '');
       } else {
         // Create Mode: Reset to defaults
-        setDate(initialDate || new Date().toISOString().split('T')[0]);
+        setDate(initialDate || getLocalTodayStr());
         setStartTime('09:00');
         setEndTime('17:00');
         setDescription('');
@@ -108,16 +116,27 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
 
   if (!isOpen) return null;
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!date) newErrors.date = "Date is required";
+    if (!taskName) newErrors.taskName = "Please select a task";
+    if (!description.trim()) newErrors.description = "Description is required";
+    
+    // Time Logic
+    if (startTime >= endTime) {
+       newErrors.endTime = "End time must be after start time";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     
-    // Validate Time: End must be after Start
-    if (startTime >= endTime) {
-        alert("End Time must be after Start Time.");
-        return;
-    }
-    
-    onSave({
+    // Call parent handler
+    const errorMessage = onSave({
       date,
       startTime,
       endTime,
@@ -127,9 +146,15 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
       description,
       managerComment
     });
+
+    // If parent returns a string, it's a validation error from backend/logic
+    if (errorMessage) {
+        setErrors(prev => ({ ...prev, global: errorMessage }));
+    }
   };
 
   const isManager = currentUser?.role === 'Manager';
+  const getFieldClass = (fieldName: string) => `w-full px-4 py-3 bg-slate-50 border rounded-xl focus:bg-white focus:outline-none focus:ring-2 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed ${errors[fieldName] ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'}`;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center backdrop-blur-sm p-0 md:p-4 transition-opacity">
@@ -152,13 +177,21 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
         </div>
         
         <div className="overflow-y-auto p-6 flex-1 bg-white">
+          
+          {errors.global && (
+             <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <span>{errors.global}</span>
+             </div>
+          )}
+
           {isReadOnly && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-2 text-xs text-amber-700">
               <Lock className="w-4 h-4" />
               Viewing employee entry. You can only add comments.
             </div>
           )}
-          <form id="logTimeForm" onSubmit={handleSubmit} className="space-y-5 pb-6">
+          <form id="logTimeForm" onSubmit={handleSubmit} className="space-y-5 pb-6" noValidate>
             
             {/* Date Input */}
             <div>
@@ -167,13 +200,13 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input 
                   type="date" 
-                  required
                   disabled={isReadOnly}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className={`${getFieldClass('date')} pl-10 pr-4`}
                 />
               </div>
+              {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
             </div>
 
             {/* Time Range */}
@@ -183,11 +216,10 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Start Time</label>
                     <div className="relative group">
                     <select
-                        required
                         disabled={isReadOnly}
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                        className={`${getFieldClass('startTime')} appearance-none cursor-pointer`}
                     >
                         {startTimeOptions.map(t => (
                             <option key={t} value={t}>{t}</option>
@@ -203,11 +235,10 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">End Time</label>
                     <div className="relative group">
                     <select
-                        required
                         disabled={isReadOnly}
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                        className={`${getFieldClass('endTime')} appearance-none cursor-pointer`}
                     >
                         {endTimeOptions.map(t => (
                             <option key={t} value={t}>{t}</option>
@@ -219,6 +250,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                     </div>
                 </div>
                 </div>
+                {errors.endTime && <p className="text-xs text-red-500 mb-2">{errors.endTime}</p>}
                 
                 {/* Calculated Duration Display */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-colors ${calculatedDuration > 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
@@ -246,9 +278,8 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                 <select 
                   value={taskName}
                   onChange={(e) => setTaskName(e.target.value)}
-                  required
                   disabled={isReadOnly}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  className={`${getFieldClass('taskName')} appearance-none cursor-pointer`}
                 >
                   <option value="" disabled>Select a Task</option>
                   {taskOptions.map(task => (
@@ -256,6 +287,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                   ))}
                 </select>
               </div>
+              {errors.taskName && <p className="text-xs text-red-500 mt-1">{errors.taskName}</p>}
             </div>
 
             <div className="grid grid-cols-1 gap-4">
@@ -268,7 +300,7 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     disabled={isReadOnly}
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={`${getFieldClass('category')} pl-10 pr-4 appearance-none cursor-pointer`}
                   >
                     <option value="Development">Development</option>
                     <option value="Design">Design</option>
@@ -287,14 +319,14 @@ const LogTimeModal: React.FC<LogTimeModalProps> = ({
               <div className="relative group">
                 <FileText className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <textarea 
-                  required
                   disabled={isReadOnly}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What details did you complete?"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-700 h-24 resize-none placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className={`${getFieldClass('description')} pl-10 pr-4 h-24 resize-none placeholder:text-slate-400`}
                 />
               </div>
+              {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
             </div>
 
             {/* Manager Comment (Only for Managers) */}

@@ -16,9 +16,11 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
   const [estimatedHours, setEstimatedHours] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [status, setStatus] = useState<TaskStatus>('ToDo');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isOpen) {
+      setErrors({});
       if (taskToEdit) {
         // Parse ID and Name from composite string "ID: Name"
         const separatorIndex = taskToEdit.name.indexOf(': ');
@@ -48,14 +50,20 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
 
   if (!isOpen) return null;
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!projectCode.trim()) newErrors.projectCode = "Task ID / Code is required";
+    if (!taskName.trim()) newErrors.taskName = "Task Name is required";
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
+
     const fullId = projectCode.toUpperCase();
-    
-    // Construct display name. If user edited the code, the name should reflect it.
-    // If editing, we keep the original ID if we treat it as immutable, but for now we allow overwrite since ID is PK.
-    // Ideally PK shouldn't change, but simpler here to just save.
-    
     const displayName = `${fullId}: ${taskName}`;
     
     onSave({
@@ -75,6 +83,8 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
     }
     onClose();
   };
+
+  const getFieldClass = (fieldName: string) => `w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-xl focus:bg-white focus:outline-none focus:ring-2 transition-all text-sm font-medium text-slate-700 ${errors[fieldName] ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'}`;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center backdrop-blur-sm p-0 md:p-4 transition-opacity">
@@ -96,21 +106,21 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5" noValidate>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Task ID / Code</label>
             <div className="relative group">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input 
                 type="text" 
-                required
                 value={projectCode}
                 onChange={(e) => setProjectCode(e.target.value)}
                 placeholder="e.g. PROJ-200"
-                readOnly={!!taskToEdit} // Prevent changing ID when editing to maintain ref integrity
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700 uppercase placeholder:normal-case read-only:opacity-60 read-only:cursor-not-allowed"
+                readOnly={!!taskToEdit} 
+                className={`${getFieldClass('projectCode')} uppercase placeholder:normal-case read-only:opacity-60 read-only:cursor-not-allowed`}
               />
             </div>
+            {errors.projectCode && <p className="text-xs text-red-500 mt-1">{errors.projectCode}</p>}
             {taskToEdit && <p className="text-[10px] text-slate-400 mt-1 pl-1">ID cannot be changed once created.</p>}
           </div>
 
@@ -120,13 +130,13 @@ const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose, onSa
               <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input 
                 type="text" 
-                required
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
                 placeholder="e.g. Database Migration"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium text-slate-700"
+                className={getFieldClass('taskName')}
               />
             </div>
+            {errors.taskName && <p className="text-xs text-red-500 mt-1">{errors.taskName}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
