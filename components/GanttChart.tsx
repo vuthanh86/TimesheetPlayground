@@ -30,7 +30,7 @@ interface TooltipInfo {
   x: number;
   y: number;
   entry: TimesheetEntry;
-  isOvertime?: boolean;
+  overtimeInfo?: { cumulative: number, limit: number };
   dayUsers?: string[];
 }
 
@@ -38,7 +38,7 @@ interface GanttRowProps {
     task: TaskGroup;
     days: Date[];
     gridStyle: React.CSSProperties;
-    overtimeEntryIds: Set<string>;
+    entryOvertimeInfo: Map<string, { cumulative: number; limit: number }>;
     onTaskClick?: (taskName: string) => void;
     onEntryClick?: (entry: TimesheetEntry) => void;
     onCellClick?: (date: Date, taskName?: string) => void;
@@ -46,6 +46,17 @@ interface GanttRowProps {
     taskDefinitions: TaskDefinition[];
     allEntries: TimesheetEntry[];
 }
+
+// Helper to format decimal hours to "1h 30m" format
+const formatDuration = (decimalHours: number) => {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  
+  if (h === 0 && m === 0) return '0h';
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+};
 
 const getCategoryColor = (category: string) => {
     switch (category) {
@@ -93,7 +104,7 @@ const GanttTaskRow = React.memo(({
     task, 
     days, 
     gridStyle, 
-    overtimeEntryIds, 
+    entryOvertimeInfo, 
     onTaskClick, 
     onEntryClick, 
     onCellClick, 
@@ -106,8 +117,7 @@ const GanttTaskRow = React.memo(({
         const def = taskDefinitions.find(t => t.name === task.name);
         if (!def || !def.estimatedHours) return null;
         
-        // This is still slightly expensive if allEntries is massive, 
-        // but it's now localized to this memoized component
+        // Calculate total logged from all history to show accurate budget usage
         const totalLogged = allEntries
           .filter(e => e.taskName === task.name)
           .reduce((sum, e) => sum + e.durationHours, 0);
@@ -164,9 +174,9 @@ const GanttTaskRow = React.memo(({
                     limitInfo.percentage > 85 ? 'bg-orange-50 text-orange-600 border-orange-100' :
                     'bg-slate-100 text-slate-600 border-slate-200'
                     }`}
-                    title={`Budget Usage: ${limitInfo.current.toFixed(1)}h / ${limitInfo.limit.toFixed(1)}h`}
+                    title={`Budget Usage: ${formatDuration(limitInfo.current)} used of ${formatDuration(limitInfo.limit)}`}
                 >
-                    {limitInfo.current.toFixed(1)} / {limitInfo.limit.toFixed(1)}h
+                    {formatDuration(limitInfo.current)} / {formatDuration(limitInfo.limit)}
                 </span>
                 )}
             </div>
@@ -198,7 +208,8 @@ const GanttTaskRow = React.memo(({
                 {dayEntries.map(entry => {
                 const widthPercent = Math.min(100, Math.max(15, (entry.durationHours / 8) * 100));
                 
-                const isOvertime = overtimeEntryIds.has(entry.id);
+                const overtimeInfo = entryOvertimeInfo.get(entry.id);
+                const isOvertime = !!overtimeInfo;
                 const colorClass = isOvertime 
                     ? 'bg-red-500 border-red-600 text-white' 
                     : getCategoryColor(entry.taskCategory);
@@ -212,7 +223,7 @@ const GanttTaskRow = React.memo(({
                             x: rect.left + (rect.width / 2),
                             y: rect.top,
                             entry,
-                            isOvertime,
+                            overtimeInfo,
                             dayUsers: dayUserNames
                         });
                     }}
@@ -229,7 +240,7 @@ const GanttTaskRow = React.memo(({
                     style={{ width: `${widthPercent}%` }}
                     >
                     {isOvertime && <AlertTriangle className="w-3 h-3 text-white fill-white/20" />}
-                    {entry.durationHours}h
+                    {formatDuration(entry.durationHours)}
                     </div>
                 );
                 })}
@@ -321,43 +332,54 @@ const GanttChart: React.FC<GanttChartProps> = ({
     return Array.from(userMap.values());
   }, [entries]);
 
-  // Determine Overtime IDs
-  const overtimeEntryIds = useMemo(() => {
-    const overtimeIds = new Set<string>();
+  // Determine Overtime IDs with details
+  const entryOvertimeInfo = useMemo(() => {
+    const infoMap = new Map<string, { cumulative: number; limit: number }>();
+    const sourceEntries = allEntries.length > 0 ? allEntries : entries;
+
+    if (!taskDefinitions || taskDefinitions.length === 0 || sourceEntries.length === 0) return infoMap;
     
-    // Use allEntries to calculate full history context
-    const allTasksMap = allEntries.reduce((acc, entry) => {
+    // Create Task Map for fast lookup
+    const taskMap = taskDefinitions.reduce((acc, t) => {
+        acc[t.name] = t;
+        return acc;
+    }, {} as Record<string, TaskDefinition>);
+
+    // Group all entries (history) by Task Name
+    const allTasksMap = sourceEntries.reduce((acc, entry) => {
       if (!acc[entry.taskName]) acc[entry.taskName] = [];
       acc[entry.taskName].push(entry);
       return acc;
     }, {} as Record<string, TimesheetEntry[]>);
 
     Object.keys(allTasksMap).forEach(taskName => {
-      const taskDef = taskDefinitions.find(t => t.name === taskName);
+      const taskDef = taskMap[taskName];
       if (!taskDef || !taskDef.estimatedHours) return;
 
       const limit = taskDef.estimatedHours;
+      // Robust Sort: Date String (YYYY-MM-DD) then Start Time (HH:mm)
+      // Allows calculating accumulation in strict chronological order
       const sortedEntries = allTasksMap[taskName].sort((a, b) => {
-        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-        if (dateDiff !== 0) return dateDiff;
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
         return a.startTime.localeCompare(b.startTime);
       });
 
       let runningTotal = 0;
       sortedEntries.forEach(entry => {
-        const prevTotal = runningTotal;
         runningTotal += entry.durationHours;
         
-        if (prevTotal >= limit) {
-           overtimeIds.add(entry.id);
-        } else if (runningTotal > limit) {
-           overtimeIds.add(entry.id);
+        // Flag if current accumulated total exceeds limit
+        if (runningTotal > limit) {
+           infoMap.set(entry.id, {
+             cumulative: runningTotal,
+             limit: limit
+           });
         }
       });
     });
 
-    return overtimeIds;
-  }, [allEntries, taskDefinitions]);
+    return infoMap;
+  }, [allEntries, entries, taskDefinitions]);
 
   // Dynamic Grid Style
   const taskColWidth = isMobile ? '140px' : '250px';
@@ -426,7 +448,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                         task={task}
                         days={days}
                         gridStyle={gridStyle}
-                        overtimeEntryIds={overtimeEntryIds}
+                        entryOvertimeInfo={entryOvertimeInfo}
                         onTaskClick={onTaskClick}
                         onEntryClick={onEntryClick}
                         onCellClick={onCellClick}
@@ -448,7 +470,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                  {dailyTotals.map((total, i) => (
                    <div key={i} className={`p-3 text-center border-l border-slate-100 ${isToday(days[i]) ? 'bg-amber-50' : 'bg-slate-50'}`}>
                      <span className={`text-sm font-bold block ${total > 8 ? 'text-indigo-600' : total > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
-                       {total > 0 ? total.toFixed(1) + 'h' : '-'}
+                       {total > 0 ? formatDuration(total) : '-'}
                      </span>
                    </div>
                  ))}
@@ -465,14 +487,19 @@ const GanttChart: React.FC<GanttChartProps> = ({
           style={{ left: hoveredTooltip.x, top: hoveredTooltip.y }}
         >
           <div className="font-semibold text-slate-100 mb-1 flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full inline-block ${hoveredTooltip.isOvertime ? 'bg-red-500' : 'bg-white/50'}`}></span>
+            <span className={`w-2 h-2 rounded-full inline-block ${hoveredTooltip.overtimeInfo ? 'bg-red-500' : 'bg-white/50'}`}></span>
             {hoveredTooltip.entry.taskName}
           </div>
           <div className="space-y-1.5 text-slate-300">
-            {hoveredTooltip.isOvertime && (
-              <div className="flex items-center gap-2 text-red-300 font-bold bg-red-900/30 p-1 rounded">
-                 <AlertTriangle className="w-3 h-3" />
-                 <span>Over Budget (Overtime)</span>
+            {hoveredTooltip.overtimeInfo && (
+              <div className="flex flex-col gap-1 text-red-300 font-bold bg-red-900/30 p-2 rounded border border-red-500/30">
+                 <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Over Budget</span>
+                 </div>
+                 <div className="text-[10px] opacity-90 font-mono">
+                    Logged: {formatDuration(hoveredTooltip.overtimeInfo.cumulative)} / {formatDuration(hoveredTooltip.overtimeInfo.limit)}
+                 </div>
               </div>
             )}
             <div className="flex items-center gap-2 text-indigo-200">
@@ -493,11 +520,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
               <span>
-                {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({hoveredTooltip.entry.durationHours}h)
+                {hoveredTooltip.entry.startTime} - {hoveredTooltip.entry.endTime} ({formatDuration(hoveredTooltip.entry.durationHours)})
               </span>
             </div>
-            {/* Show Limit Context in Tooltip */}
-            {(() => {
+            
+            {!hoveredTooltip.overtimeInfo && (() => {
+                // Only show general budget usage if NOT already showing overtime warning
                 const def = taskDefinitions.find(t => t.name === hoveredTooltip.entry.taskName);
                 if (def && def.estimatedHours) {
                     const total = allEntries
@@ -506,12 +534,13 @@ const GanttChart: React.FC<GanttChartProps> = ({
                     return (
                         <div className="flex items-center gap-2 text-amber-300 border-t border-slate-700/50 pt-1 mt-1">
                         <AlertCircle className="w-3 h-3" />
-                        <span>Task Budget: {total.toFixed(1)}h / {def.estimatedHours.toFixed(1)}h</span>
+                        <span>Task Budget: {formatDuration(total)} / {formatDuration(def.estimatedHours)}</span>
                         </div>
                     );
                 }
                 return null;
             })()}
+
             {hoveredTooltip.entry.description && (
               <div className="flex items-start gap-2 pt-1 border-t border-slate-700/50 mt-1">
                 <FileText className="w-3 h-3 mt-0.5 shrink-0" />
